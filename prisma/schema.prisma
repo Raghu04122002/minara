@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Person {
+  id        String   @id @default(uuid())
+  firstName String?
+  lastName  String?
+  email     String?
+  phone     String?
+  
+  familyId  String?
+  family    Family?  @relation(fields: [familyId], references: [id])
+  
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id])
+
+  transactions Transaction[]
+  memberships  FamilyMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([email])
+  @@index([phone])
+  @@index([lastName])
+}
+
+model Transaction {
+  id           String   @id @default(uuid())
+  amount       Decimal
+  type         String   // ticket, donation, program
+  description  String?
+  occurredAt   DateTime
+  sourceSystem String?
+  
+  personId     String
+  person       Person   @relation(fields: [personId], references: [id])
+  
+  familyId     String?
+  family       Family?  @relation(fields: [familyId], references: [id])
+  
+  createdAt    DateTime @default(now())
+}
+
+model Family {
+  id        String   @id @default(uuid())
+  name      String
+  
+  people    Person[]
+  members   FamilyMember[]
+  transactions Transaction[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FamilyMember {
+  id        String   @id @default(uuid())
+  role      String   // HEAD, SPOUSE, CHILD, UNKNOWN
+  groupedBy String   // PHONE, EMAIL, ADDRESS
+  
+  familyId  String
+  family    Family   @relation(fields: [familyId], references: [id])
+  
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id])
+
+  createdAt DateTime @default(now())
+  
+  @@unique([familyId, personId])
+}
+
+model Address {
+  id             String   @id @default(uuid())
+  line1          String?
+  city           String?
+  state          String?
+  postalCode     String?
+  normalizedHash String?  @unique
+  
+  people         Person[]
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      String   @default("ADMIN") // SUPER_ADMIN or ADMIN
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
