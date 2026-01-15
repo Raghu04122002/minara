@@ -5,17 +5,26 @@ export const dynamic = 'force-dynamic';
 
 export async function POST() {
     try {
-        // Delete in order of dependencies
-        await prisma.transaction.deleteMany({});
-        await prisma.familyMember.deleteMany({});
-        await prisma.person.deleteMany({});
-        await prisma.family.deleteMany({});
-        // Address is not populated yet, but if it were:
-        // await prisma.address.deleteMany({});
+        // Use a transaction for atomic reset
+        await prisma.$transaction([
+            prisma.transaction.deleteMany({}),
+            prisma.familyMember.deleteMany({}),
+            prisma.person.deleteMany({}),
+            prisma.family.deleteMany({}),
+        ]);
 
-        return NextResponse.json({ success: true, message: 'Database cleared' });
-    } catch (error) {
-        console.error('Reset error:', error);
-        return NextResponse.json({ success: false, error: 'Failed to reset database' }, { status: 500 });
+        return NextResponse.json({ success: true, message: 'Database cleared successfully' });
+    } catch (error: any) {
+        console.error('Full Reset Error:', {
+            message: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack
+        });
+        return NextResponse.json({
+            success: false,
+            error: 'Failed to reset database',
+            details: error.message
+        }, { status: 500 });
     }
 }
