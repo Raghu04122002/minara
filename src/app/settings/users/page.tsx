@@ -29,8 +29,13 @@ export default function UserManagement() {
             if (res.ok) {
                 const data = await res.json();
                 setUsers(data);
-            } else if (res.status === 403) {
-                setError('Access denied. Only livoranger@gmail.com can access this page.');
+            } else {
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 403) {
+                    setError('Access denied. Only livoranger@gmail.com can access this page.');
+                } else {
+                    setError(data.error || `Error ${res.status}: Failed to load users`);
+                }
             }
         } catch (e) {
             console.error(e);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,29 +20,18 @@ export async function GET() {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // Use service role to list all users
-        const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-        const supabaseAdmin = createServiceClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false
-                }
-            }
-        );
-
+        const supabaseAdmin = createAdminClient();
         const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
 
         if (error) {
+            console.error('Supabase admin listUsers error:', error);
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
         return NextResponse.json(users.users);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error listing users:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
     }
 }
 
@@ -67,19 +57,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
         }
 
-        // Use service role to create user
-        const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-        const supabaseAdmin = createServiceClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false
-                }
-            }
-        );
-
+        const supabaseAdmin = createAdminClient();
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
@@ -87,13 +65,14 @@ export async function POST(req: Request) {
         });
 
         if (error) {
+            console.error('Supabase admin createUser error:', error);
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
         return NextResponse.json(data.user);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error creating user:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
     }
 }
 
@@ -125,28 +104,17 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
         }
 
-        // Use service role to delete user
-        const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-        const supabaseAdmin = createServiceClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false
-                }
-            }
-        );
-
+        const supabaseAdmin = createAdminClient();
         const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
         if (error) {
+            console.error('Supabase admin deleteUser error:', error);
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error deleting user:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
     }
 }
