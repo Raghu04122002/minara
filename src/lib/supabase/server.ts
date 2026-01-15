@@ -4,8 +4,8 @@ import { cookies } from 'next/headers'
 export async function createClient() {
     const cookieStore = await cookies()
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^["'](.+)["']$/, '$1')
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.replace(/^["'](.+)["']$/, '$1')
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/^["'](.+)["']$/, '$1')?.trim()
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim().replace(/^["'](.+)["']$/, '$1')?.trim()
 
     if (!supabaseUrl || !supabaseAnonKey) {
         throw new Error('Missing Supabase environment variables.')
