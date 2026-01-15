@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { runHouseholding } from '@/lib/householding/grouper';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST() {
     try {
         const result = await runHouseholding();
