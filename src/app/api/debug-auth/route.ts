@@ -26,8 +26,12 @@ export async function GET() {
 
         const rawLength = serviceKey.length;
         const trimmedLength = serviceKey.trim().length;
-        const strippedKey = serviceKey.trim().replace(/^["'](.+)["']$/, '$1');
+        const strippedKey = serviceKey.replace(/["']/g, '').trim();
         const finalLength = strippedKey.length;
+
+        // Diagnostic hex dump (first 5 and last 5)
+        const first5Hex = Buffer.from(strippedKey.substring(0, 5)).toString('hex');
+        const last5Hex = Buffer.from(strippedKey.substring(strippedKey.length - 5)).toString('hex');
 
         // Test the client
         const supabaseAdmin = createAdminClient();
@@ -36,12 +40,13 @@ export async function GET() {
         return NextResponse.json({
             config: {
                 urlPrefix: supabaseUrl.substring(0, 15),
-                serviceKeyPrefix: strippedKey.substring(0, 5),
-                serviceKeySuffix: strippedKey.substring(strippedKey.length - 5),
+                serviceKeyPrefix: strippedKey.substring(0, 5) + '...',
+                first5Hex,
+                last5Hex,
                 rawLength,
                 trimmedLength,
                 finalLength,
-                hasQuotes: serviceKey.startsWith('"') || serviceKey.startsWith("'"),
+                hasQuotes: serviceKey.includes('"') || serviceKey.includes("'"),
                 envType: typeof serviceKey
             },
             test: {
