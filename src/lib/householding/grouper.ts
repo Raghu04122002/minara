@@ -137,11 +137,11 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string, grou
     // Determine Family Name: Priority is Head's Last Name
     let familyName = head.lastName ? `${head.lastName} Family` : `${head.firstName || 'Unknown'}'s Household`;
 
-    // If grouped by email, maybe indicate it in name if appropriate? 
-    // User said "mention email address". I'll add it as a log and potentially in a new family field or just the name.
-    if (groupedBy === 'EMAIL' && groupKey) {
-        console.log(`Creating family for email group: ${groupKey}`);
+    // Append identifier if requested
+    if (groupKey) {
+        familyName += ` (${groupKey})`;
     }
+
 
     // Create Family
     const family = await prisma.family.create({
