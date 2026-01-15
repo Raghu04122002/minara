@@ -42,7 +42,14 @@ export function createAdminClient() {
     return createClient(supabaseUrl, supabaseServiceRoleKey, {
         auth: {
             autoRefreshToken: false,
-            persistSession: false
+            persistSession: false,
+            detectSessionInUrl: false
+        },
+        global: {
+            headers: {
+                Authorization: `Bearer ${supabaseServiceRoleKey}`,
+                apikey: supabaseServiceRoleKey
+            }
         }
     })
 }
