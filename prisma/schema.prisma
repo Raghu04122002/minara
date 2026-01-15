@@ -46,6 +46,18 @@ model Transaction {
   familyId     String?
   family       Family?  @relation(fields: [familyId], references: [id])
   
+  importFileId String?
+  importFile   RawImportFile? @relation(fields: [importFileId], references: [id])
+
+  createdAt    DateTime @default(now())
+}
+
+model RawImportFile {
+  id           String   @id @default(uuid())
+  filename     String
+  rowCount     Int
+  sourceSystem String?
+  transactions Transaction[]
   createdAt    DateTime @default(now())
 }
 

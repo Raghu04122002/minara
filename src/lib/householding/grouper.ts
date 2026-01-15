@@ -2,15 +2,23 @@ import { prisma } from '@/lib/prisma';
 import { Person, Family, FamilyMember } from '@prisma/client';
 
 export async function runHouseholding() {
-    const log: string[] = []; // Initialize log array with explicit type
+    const log: string[] = [];
     const result = {
         familiesCreated: 0,
         peopleGrouped: 0,
         byPhone: 0,
         byEmail: 0,
-        byAddress: 0,
-        logs: log, // Add logs to the result object
+        logs: log,
     };
+
+    // Wipe existing families to recompute from scratch (Phase 1A recomputation)
+    console.log('--- Wiping existing families for recomputation ---');
+    await prisma.$transaction([
+        prisma.familyMember.deleteMany({}),
+        prisma.transaction.updateMany({ data: { familyId: null } }),
+        prisma.person.updateMany({ data: { familyId: null } }),
+        prisma.family.deleteMany({}),
+    ]);
 
     // 1. Group by Phone
     // Get all people with phone, grouped by phone
@@ -88,7 +96,9 @@ export async function runHouseholding() {
     for (let i = 0; i < soloPeople.length; i += CHUNK_SIZE) {
         const chunk = soloPeople.slice(i, i + CHUNK_SIZE);
         await Promise.all(chunk.map(async (person: any) => {
-            const familyName = person.lastName ? `${person.lastName} Family` : (person.firstName ? `${person.firstName}'s Household` : 'Individual Household');
+            const familyName = person.lastName
+                ? `${person.firstName || ''} ${person.lastName} Household`.trim()
+                : (person.firstName ? `${person.firstName}'s Household` : 'Individual Household');
 
             return prisma.$transaction(async (tx: any) => {
                 const family = await tx.family.create({

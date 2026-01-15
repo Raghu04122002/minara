@@ -41,8 +41,33 @@ function findBestColumn(row: CSVRow, primaryKeywords: string[]): string | undefi
     return undefined;
 }
 
-export async function processCSVImport(content: string, sourceSystem: string = 'CSV Import'): Promise<ImportResult> {
+interface ImportOptions {
+    mode: 'append' | 'replace';
+}
+
+export async function processCSVImport(content: string, filename: string = 'Upload', options: ImportOptions = { mode: 'append' }): Promise<ImportResult> {
+    if (options.mode === 'replace') {
+        console.log('--- Wiping DB for Replace Mode ---');
+        await prisma.$transaction([
+            prisma.transaction.deleteMany({}),
+            prisma.familyMember.deleteMany({}),
+            prisma.person.deleteMany({}),
+            prisma.family.deleteMany({}),
+            prisma.rawImportFile.deleteMany({}),
+        ]);
+    }
+
     const rows = parseCSV(content);
+
+    // Create RawImportFile record
+    const importFile = await prisma.rawImportFile.create({
+        data: {
+            filename,
+            rowCount: rows.length,
+            sourceSystem: filename.includes('_') ? filename.split('_')[1] : 'Upload'
+        }
+    });
+
     const result: ImportResult = {
         totalRows: rows.length,
         createdPeople: 0,
@@ -158,9 +183,10 @@ export async function processCSVImport(content: string, sourceSystem: string = '
                     personId: person.id,
                     type: typeStr || 'import',
                     amount: amount,
-                    description: description || `Imported from ${sourceSystem}`,
+                    description: description || `Imported from ${filename}`,
                     occurredAt: occurredAt,
-                    sourceSystem: sourceSystem,
+                    sourceSystem: filename,
+                    importFileId: importFile.id,
                 }
             });
             result.createdTransactions++;

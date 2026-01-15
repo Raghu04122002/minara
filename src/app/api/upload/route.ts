@@ -13,7 +13,9 @@ export async function POST(request: NextRequest) {
         }
 
         const content = await file.text();
-        const result = await processCSVImport(content, file.name || 'Upload');
+        const mode = (formData.get('mode') as 'append' | 'replace') || 'append';
+
+        const result = await processCSVImport(content, file.name || 'Upload', { mode });
 
         return NextResponse.json(result);
     } catch (error) {

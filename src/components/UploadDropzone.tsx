@@ -8,6 +8,7 @@ import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 export default function UploadDropzone() {
     const router = useRouter();
     const [isUploading, setIsUploading] = useState(false);
+    const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [message, setMessage] = useState('');
 
@@ -21,6 +22,7 @@ export default function UploadDropzone() {
 
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('mode', importMode);
 
         try {
             const res = await fetch('/api/upload', {
@@ -59,6 +61,23 @@ export default function UploadDropzone() {
             <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
                 Upload your CSV files from Eventbrite, Stripe, or other sources.
             </p>
+
+            <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                <button
+                    onClick={() => setImportMode('append')}
+                    className={importMode === 'append' ? 'btn btn-primary' : 'btn'}
+                    style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}
+                >
+                    Append to Existing
+                </button>
+                <button
+                    onClick={() => setImportMode('replace')}
+                    className={importMode === 'replace' ? 'btn btn-primary' : 'btn'}
+                    style={{ fontSize: '0.8rem', padding: '0.5rem 1rem', background: importMode === 'replace' ? '#dc2626' : undefined, borderColor: importMode === 'replace' ? '#dc2626' : undefined }}
+                >
+                    Replace All Data
+                </button>
+            </div>
 
             <div style={{ position: 'relative', display: 'inline-block' }}>
                 <input
