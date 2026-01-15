@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 
 const prismaClientSingleton = () => {
+  // Skip Prisma initialization during build if no DATABASE_URL
+  if (!process.env.DATABASE_URL) {
+    return null as any;
+  }
   return new PrismaClient();
 };
 
