@@ -109,7 +109,7 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
             }
 
             // Transaction Data
-            const amountStr = findBestColumn(row, ['amount', 'price', 'ticket price', 'total', 'value']);
+            const amountStr = findBestColumn(row, ['amount', 'price', 'ticket price', 'total', 'value', 'amountpaid', 'feepaid', 'amount paid', 'fee paid', 'contribution']);
             const dateStr = findBestColumn(row, ['date', 'order date', 'time', 'timestamp', 'created at', 'start date']);
             const typeStr = findBestColumn(row, ['ticket type', 'type', 'category']) || 'unknown';
             const description = findBestColumn(row, ['event name', 'description', 'memo', 'note', 'ticket tier']);
@@ -139,7 +139,12 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
                 addressId = address.id;
             }
 
-            let person = await findMatchingPerson({ email, phone, lastName: finalLast });
+            let person = await findMatchingPerson({
+                email,
+                phone,
+                firstName: finalFirst,
+                lastName: finalLast
+            });
 
             if (!person) {
                 person = await createPerson({

@@ -99,7 +99,7 @@ interface PersonInput {
 export async function findMatchingPerson(
     input: PersonInput
 ): Promise<Person | null> {
-    const { email, phone, lastName } = input;
+    const { email, phone, firstName, lastName } = input;
     const normalizedPhone = normalizePhone(phone);
     const cleanEmail = email?.trim().toLowerCase();
 
@@ -116,14 +116,13 @@ export async function findMatchingPerson(
         });
 
         if (potentialMatches.length > 0) {
-            // Find one that matches last name if provided
-            if (lastName && lastName.trim()) {
-                const nameMatch = potentialMatches.find((p: any) => !p.lastName || p.lastName.toLowerCase() === lastName.trim().toLowerCase());
-                if (nameMatch) return nameMatch;
-            } else {
-                // If incoming has no last name, return the first one with same email
-                return potentialMatches[0];
-            }
+            // Priority: Find a match where BOTH first and last names match if provided
+            const fullMatch = potentialMatches.find((p: any) => {
+                const sameLast = !lastName || !p.lastName || p.lastName.toLowerCase() === lastName.trim().toLowerCase();
+                const sameFirst = !firstName || !p.firstName || p.firstName.toLowerCase() === firstName.trim().toLowerCase();
+                return sameLast && sameFirst;
+            });
+            if (fullMatch) return fullMatch;
         }
     }
 
@@ -136,16 +135,16 @@ export async function findMatchingPerson(
         });
 
         if (potentialMatches.length > 0) {
-            if (lastName && lastName.trim()) {
-                const nameMatch = potentialMatches.find((p: any) => !p.lastName || p.lastName.toLowerCase() === lastName.trim().toLowerCase());
-                if (nameMatch) return nameMatch;
-            } else {
-                return potentialMatches[0];
-            }
+            const fullMatch = potentialMatches.find((p: any) => {
+                const sameLast = !lastName || !p.lastName || p.lastName.toLowerCase() === lastName.trim().toLowerCase();
+                const sameFirst = !firstName || !p.firstName || p.firstName.toLowerCase() === firstName.trim().toLowerCase();
+                return sameLast && sameFirst;
+            });
+            if (fullMatch) return fullMatch;
         }
     }
 
-    // 3. Else, same email + same last name (already handled by #1 logic mostly, but for completeness)
+    // 3. Else, same email + same last name
     if (cleanEmail && lastName && lastName.trim()) {
         const match = await prisma.person.findFirst({
             where: {
@@ -153,6 +152,10 @@ export async function findMatchingPerson(
                 lastName: { equals: lastName.trim(), mode: 'insensitive' }
             }
         });
+        // If we found someone but they have a DIFFERENT first name, it's NOT a match
+        if (match && firstName && match.firstName && match.firstName.toLowerCase() !== firstName.trim().toLowerCase()) {
+            return null;
+        }
         if (match) return match;
     }
 
