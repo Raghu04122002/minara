@@ -90,8 +90,30 @@ export async function processCSVImport(content: string, sourceSystem: string = '
             const description = findBestColumn(row, ['event name', 'description', 'memo', 'note', 'ticket tier']);
 
             // Match or Create Person
-            // If they have NO identifiers (email/phone), we use name + OrderID?
-            // For now, names are enough to create a Person, but we won't match them to others easily without IDs.
+            // Address / Household Grouping Information
+            const city = sanitize(findBestColumn(row, ['city', 'purchaser city']));
+            const state = sanitize(findBestColumn(row, ['state', 'purchaser state', 'province']));
+            const zip = sanitize(findBestColumn(row, ['zip', 'postal code', 'purchaser postal code']));
+
+            let addressId: string | null = null;
+            if (buyerEmail || (city && state)) {
+                // Create a shared identifier for grouping via Address hash
+                const hashInput = `VIRTUAL_${buyerEmail || ''}_${city || ''}_${state || ''}_${zip || ''}`;
+                const normalizedHash = hashInput.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                const address = await prisma.address.upsert({
+                    where: { normalizedHash },
+                    update: {},
+                    create: {
+                        city: city,
+                        state: state,
+                        postalCode: zip,
+                        normalizedHash: normalizedHash
+                    }
+                });
+                addressId = address.id;
+            }
+
             let person = await findMatchingPerson({ email, phone, lastName: finalLast });
 
             if (!person) {
@@ -99,10 +121,19 @@ export async function processCSVImport(content: string, sourceSystem: string = '
                     email,
                     phone,
                     firstName: finalFirst,
-                    lastName: finalLast
+                    lastName: finalLast,
+                    addressId: addressId
                 });
                 result.createdPeople++;
+            } else if (addressId && !person.addressId) {
+                // Update existing person with address if missing
+                person = await prisma.person.update({
+                    where: { id: (person as any).id },
+                    data: { addressId }
+                });
             }
+
+            if (!person) throw new Error("Failed to create or find person");
 
             // Parse Amount
             let amount: string | number = 0;

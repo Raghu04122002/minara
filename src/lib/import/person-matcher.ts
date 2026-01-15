@@ -7,6 +7,7 @@ interface PersonInput {
     phone?: string | null;
     firstName?: string | null;
     lastName?: string | null;
+    addressId?: string | null;
 }
 
 /**
@@ -135,7 +136,7 @@ export async function findMatchingPerson(
 }
 
 export async function createPerson(input: PersonInput): Promise<Person> {
-    const { email, phone, firstName, lastName } = input;
+    const { email, phone, firstName, lastName, addressId } = input;
     const normalizedPhone = normalizePhone(phone);
 
     return await prisma.person.create({
@@ -144,6 +145,7 @@ export async function createPerson(input: PersonInput): Promise<Person> {
             phone: normalizedPhone,
             firstName: firstName ? firstName.trim() : null,
             lastName: lastName ? lastName.trim() : null,
+            addressId: addressId,
         }
     });
 }

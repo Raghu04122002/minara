@@ -34,7 +34,7 @@ export default async function PeopleList({
                 select: { name: true }
             }
         },
-        take: 200 // Limit for MVP performance
+        take: 1000 // Increased for larger datasets
     });
 
     const peopleWithStats = people.map((p: any) => {
