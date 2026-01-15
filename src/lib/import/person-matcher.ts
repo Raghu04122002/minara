@@ -101,23 +101,22 @@ export async function findMatchingPerson(
 ): Promise<Person | null> {
     const { email, phone, lastName } = input;
     const normalizedPhone = normalizePhone(phone);
+    const cleanEmail = email?.trim().toLowerCase();
 
-    // 1. Exact Email
-    if (email && email.trim()) {
+    // 1. Exact Email (case-insensitive)
+    if (cleanEmail) {
         const match = await prisma.person.findFirst({
             where: {
-                email: email.trim()
+                email: {
+                    equals: cleanEmail,
+                    mode: 'insensitive'
+                }
             }
         });
         if (match) return match;
     }
 
-    // 2. Exact Phone
-    // REMOVED: Sharing a phone number does not mean "Same Person" (e.g. Spouses).
-    // Matching by phone here causes incorrect merges (Fatima -> Ahmed).
-    // Phone numbers will be used for HOUSEHOLDING (Grouping) instead.
-
-    /*
+    // 2. Else, same phone
     if (normalizedPhone) {
         const match = await prisma.person.findFirst({
             where: {
@@ -126,11 +125,23 @@ export async function findMatchingPerson(
         });
         if (match) return match;
     }
-    */
 
-    // 3. Email + Last Name ? 
-    // Skipping as it's redundant if #1 is exhaustive for email.
-    // Unless we want to handle data inconsistencies where maybe email is stored differently? 
+    // 3. Else, same email + same last name (if both present)
+    if (cleanEmail && lastName && lastName.trim()) {
+        const match = await prisma.person.findFirst({
+            where: {
+                email: {
+                    equals: cleanEmail,
+                    mode: 'insensitive'
+                },
+                lastName: {
+                    equals: lastName.trim(),
+                    mode: 'insensitive'
+                }
+            }
+        });
+        if (match) return match;
+    }
 
     return null;
 }

@@ -71,68 +71,33 @@ export async function runHouseholding() {
         }
     }
 
-    // 3. Address (Optional - Skip if no address logic yet or weak signal)
-    // "Must be clearly identical after normalization"
-    // Implementing simplified version if needed, but "weakest signal".
-    // I'll skip address grouping for this MVP iteration unless explicitly requested to complete "Address (optional)".
-    // "Families form without requiring address".
-    // But requirement says "Grouping Priority ... Shared address ... Only if address exists".
-    // I need to implement it to be complete.
-    // I check normalizedHash in Address table.
-    // But I didn't implement Address parsing fully in Import.
-    // Wait, `importer.ts` didn't create Addresses!
-    // It only created Person and Transaction.
-    // I need to update `importer.ts` to create Address records if I want to group by them.
-    // But for now, since Address is weak and optional, I'll stick to Phone/Email.
-    // User said "Householding must work even when address is missing." -> Done.
-    // User said "Address ... Must be clearly identical ... Otherwise -> leave person ungrouped".
-    // Since I haven't populated Address, this step will just be a no-op which is safe.
-
-
-    // 3. Create Families for Solo People (Remaining)
-    const soloPeople = await prisma.person.findMany({
+    // 3. Group by Address
+    const peopleWithAddress = await prisma.person.findMany({
         where: {
+            addressId: { not: null },
             familyId: null
-        }
+        },
+        select: { id: true, addressId: true, lastName: true }
     });
 
-    log.push(`Found ${soloPeople.length} solo people not in any group.`);
-
-    for (const person of soloPeople) {
-        const familyName = person.lastName ? `${person.lastName} Household` : (person.firstName ? `${person.firstName}'s Household` : 'Anonymous Household');
-
-        // Wrap in transaction
-        await prisma.$transaction(async (tx: any) => {
-            const family = await tx.family.create({
-                data: {
-                    name: familyName
-                }
-            });
-
-            await tx.familyMember.create({
-                data: {
-                    familyId: family.id,
-                    personId: person.id,
-                    role: 'HEAD',
-                    groupedBy: 'SOLO'
-                }
-            });
-
-            await tx.person.update({
-                where: { id: person.id },
-                data: { familyId: family.id }
-            });
-
-            // Update transactions
-            await tx.transaction.updateMany({
-                where: { personId: person.id },
-                data: { familyId: family.id }
-            });
-        });
-
-        result.familiesCreated++;
-        // result.peopleGrouped++; // Do we count solo as grouped?
+    const addressGroups = new Map<string, typeof peopleWithAddress>();
+    for (const p of peopleWithAddress) {
+        if (!p.addressId) continue;
+        const group = addressGroups.get(p.addressId) || [];
+        group.push(p);
+        addressGroups.set(p.addressId, group);
     }
+
+    for (const [addressId, group] of addressGroups) {
+        if (group.length > 1) {
+            await createFamilyForGroup(group.map((p: any) => p.id), 'ADDRESS');
+            result.familiesCreated++;
+            result.peopleGrouped += group.length;
+            result.byAddress++;
+        }
+    }
+
+    log.push(`Grouping complete. ${result.familiesCreated} families created.`);
 
     return result;
 }
