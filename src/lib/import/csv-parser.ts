@@ -14,7 +14,7 @@ export function parseCSV(content: string): CSVRow[] {
         skip_empty_lines: true,
         trim: true,
         relax_column_count: true, // Inconsistent CSVs might have trailing commas
-    });
+    }) as CSVRow[];
 
     return records;
 }

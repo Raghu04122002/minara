@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { Person, Family, FamilyMember } from '@prisma/client';
 
 export async function runHouseholding() {
-    const log = []; // Initialize log array
+    const log: string[] = []; // Initialize log array with explicit type
     const result = {
         familiesCreated: 0,
         peopleGrouped: 0,
