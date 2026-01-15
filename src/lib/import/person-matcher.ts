@@ -103,9 +103,10 @@ export async function findMatchingPerson(
     const normalizedPhone = normalizePhone(phone);
     const cleanEmail = email?.trim().toLowerCase();
 
-    // 1. Exact Email (case-insensitive)
+    // 1. Exact Email (case-insensitive) + Name Match
+    // We only merge if the last names match or one is missing, to avoid merging Jane & John Smith.
     if (cleanEmail) {
-        const match = await prisma.person.findFirst({
+        const potentialMatches = await prisma.person.findMany({
             where: {
                 email: {
                     equals: cleanEmail,
@@ -113,31 +114,43 @@ export async function findMatchingPerson(
                 }
             }
         });
-        if (match) return match;
+
+        if (potentialMatches.length > 0) {
+            // Find one that matches last name if provided
+            if (lastName && lastName.trim()) {
+                const nameMatch = potentialMatches.find((p: any) => !p.lastName || p.lastName.toLowerCase() === lastName.trim().toLowerCase());
+                if (nameMatch) return nameMatch;
+            } else {
+                // If incoming has no last name, return the first one with same email
+                return potentialMatches[0];
+            }
+        }
     }
 
-    // 2. Else, same phone
+    // 2. Else, same phone + Name Match
     if (normalizedPhone) {
-        const match = await prisma.person.findFirst({
+        const potentialMatches = await prisma.person.findMany({
             where: {
                 phone: normalizedPhone
             }
         });
-        if (match) return match;
+
+        if (potentialMatches.length > 0) {
+            if (lastName && lastName.trim()) {
+                const nameMatch = potentialMatches.find((p: any) => !p.lastName || p.lastName.toLowerCase() === lastName.trim().toLowerCase());
+                if (nameMatch) return nameMatch;
+            } else {
+                return potentialMatches[0];
+            }
+        }
     }
 
-    // 3. Else, same email + same last name (if both present)
+    // 3. Else, same email + same last name (already handled by #1 logic mostly, but for completeness)
     if (cleanEmail && lastName && lastName.trim()) {
         const match = await prisma.person.findFirst({
             where: {
-                email: {
-                    equals: cleanEmail,
-                    mode: 'insensitive'
-                },
-                lastName: {
-                    equals: lastName.trim(),
-                    mode: 'insensitive'
-                }
+                email: { equals: cleanEmail, mode: 'insensitive' },
+                lastName: { equals: lastName.trim(), mode: 'insensitive' }
             }
         });
         if (match) return match;

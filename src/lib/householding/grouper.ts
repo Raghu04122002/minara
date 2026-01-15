@@ -73,7 +73,52 @@ export async function runHouseholding() {
         }
     }
 
-    log.push(`Grouping complete. ${result.familiesCreated} families created.`);
+    // 3. Create Families for Solo People (Remaining)
+    // "if no families then solo should be visible"
+    const soloPeople = await prisma.person.findMany({
+        where: {
+            familyId: null
+        }
+    });
+
+    log.push(`Creating solo households for ${soloPeople.length} people.`);
+
+    // Batch solo household creation
+    const CHUNK_SIZE = 50;
+    for (let i = 0; i < soloPeople.length; i += CHUNK_SIZE) {
+        const chunk = soloPeople.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(async (person: any) => {
+            const familyName = person.lastName ? `${person.lastName} Family` : (person.firstName ? `${person.firstName}'s Household` : 'Individual Household');
+
+            return prisma.$transaction(async (tx: any) => {
+                const family = await tx.family.create({
+                    data: { name: familyName }
+                });
+
+                await tx.familyMember.create({
+                    data: {
+                        familyId: family.id,
+                        personId: person.id,
+                        role: 'HEAD',
+                        groupedBy: 'SOLO'
+                    }
+                });
+
+                await tx.person.update({
+                    where: { id: person.id },
+                    data: { familyId: family.id }
+                });
+
+                await tx.transaction.updateMany({
+                    where: { personId: person.id },
+                    data: { familyId: family.id }
+                });
+            });
+        }));
+        result.familiesCreated += chunk.length;
+    }
+
+    log.push(`Grouping complete. ${result.familiesCreated} families created in total.`);
 
     return result;
 }
