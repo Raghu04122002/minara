@@ -35,10 +35,11 @@ export async function runHouseholding() {
     }
 
     for (const [phone, group] of phoneGroups) {
-        if (group.length > 1) {
-            await createFamilyForGroup(group.map((p: any) => p.id), 'PHONE');
+        const uniqueIds = Array.from(new Set(group.map((p: any) => p.id as string)));
+        if (uniqueIds.length > 1) {
+            await createFamilyForGroup(uniqueIds as string[], 'PHONE', phone);
             result.familiesCreated++;
-            result.peopleGrouped += group.length;
+            result.peopleGrouped += uniqueIds.length;
             result.byPhone++;
         }
     }
@@ -55,7 +56,6 @@ export async function runHouseholding() {
     const emailGroups = new Map<string, typeof peopleWithEmail>();
     for (const p of peopleWithEmail) {
         if (!p.email) continue;
-        // Email normalization for grouping? Requirement: "Exact email match (case-insensitive)"
         const key = p.email.toLowerCase().trim();
         const group = emailGroups.get(key) || [];
         group.push(p);
@@ -63,37 +63,13 @@ export async function runHouseholding() {
     }
 
     for (const [email, group] of emailGroups) {
-        if (group.length > 1) {
-            await createFamilyForGroup(group.map((p: any) => p.id), 'EMAIL');
+        // Ensure we have at least 2 UNIQUE people
+        const uniqueIds = Array.from(new Set(group.map((p: any) => p.id as string)));
+        if (uniqueIds.length > 1) {
+            await createFamilyForGroup(uniqueIds as string[], 'EMAIL', email);
             result.familiesCreated++;
-            result.peopleGrouped += group.length;
+            result.peopleGrouped += uniqueIds.length;
             result.byEmail++;
-        }
-    }
-
-    // 3. Group by Address
-    const peopleWithAddress = await prisma.person.findMany({
-        where: {
-            addressId: { not: null },
-            familyId: null
-        },
-        select: { id: true, addressId: true, lastName: true }
-    });
-
-    const addressGroups = new Map<string, typeof peopleWithAddress>();
-    for (const p of peopleWithAddress) {
-        if (!p.addressId) continue;
-        const group = addressGroups.get(p.addressId) || [];
-        group.push(p);
-        addressGroups.set(p.addressId, group);
-    }
-
-    for (const [addressId, group] of addressGroups) {
-        if (group.length > 1) {
-            await createFamilyForGroup(group.map((p: any) => p.id), 'ADDRESS');
-            result.familiesCreated++;
-            result.peopleGrouped += group.length;
-            result.byAddress++;
         }
     }
 
@@ -102,23 +78,24 @@ export async function runHouseholding() {
     return result;
 }
 
-async function createFamilyForGroup(personIds: string[], groupedBy: string) {
-    // Fetch full details to decide name
+async function createFamilyForGroup(personIds: string[], groupedBy: string, groupKey?: string) {
     const people = await prisma.person.findMany({
-        where: { id: { in: personIds } }
+        where: { id: { in: personIds } },
+        orderBy: { createdAt: 'asc' }
     });
 
-    // Determine Family Name
-    // "Same last name -> <LastName> Family"
-    // "Otherwise -> Shared Household"
-    const lastNames = new Set(people.map((p: any) => p.lastName).filter(Boolean));
-    let familyName = 'Shared Household';
-    if (lastNames.size === 1) {
-        familyName = `${Array.from(lastNames)[0]} Family`;
-    } else {
-        // If mixed, check if majority? No, rule is "Same last name". implies ALL same.
-        // Or maybe just pick one? "Otherwise -> Shared Household".
-        // I'll stick to strict rule.
+    if (people.length === 0) return;
+
+    // Head is the first person (oldest record)
+    const head = people[0];
+
+    // Determine Family Name: Priority is Head's Last Name
+    let familyName = head.lastName ? `${head.lastName} Family` : `${head.firstName || 'Unknown'}'s Household`;
+
+    // If grouped by email, maybe indicate it in name if appropriate? 
+    // User said "mention email address". I'll add it as a log and potentially in a new family field or just the name.
+    if (groupedBy === 'EMAIL' && groupKey) {
+        console.log(`Creating family for email group: ${groupKey}`);
     }
 
     // Create Family
@@ -129,22 +106,15 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string) {
     });
 
     // Create Members and Update People
-    // "First person -> HEAD. Others -> UNKNOWN"
-    // Order by what? CreatedAt? Or just list order?
-    // I'll sort by createdAt or ID.
-    const sorted = people.sort((a: any, b: any) => a.createdAt.getTime() - b.createdAt.getTime());
+    for (let i = 0; i < people.length; i++) {
+        const p = people[i];
+        const role = i === 0 ? 'HEAD' : 'UNKNOWN';
 
-    for (let i = 0; i < sorted.length; i++) {
-        const p = sorted[i];
-        const role = i === 0 ? 'HEAD' : 'UNKNOWN'; // First as HEAD
-
-        // Update Person
         await prisma.person.update({
             where: { id: p.id },
             data: { familyId: family.id }
         });
 
-        // Create Member
         await prisma.familyMember.create({
             data: {
                 familyId: family.id,
@@ -154,8 +124,6 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string) {
             }
         });
 
-        // Update Transactions?
-        // "Set: person.family_id, transaction.family_id"
         await prisma.transaction.updateMany({
             where: { personId: p.id },
             data: { familyId: family.id }
