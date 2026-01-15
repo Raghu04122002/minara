@@ -10,12 +10,34 @@ interface ImportResult {
     errors: string[];
 }
 
-function findColumn(row: CSVRow, possibleNames: string[]): string | undefined {
-    const keys = Object.keys(row);
-    for (const name of possibleNames) {
-        const found = keys.find(k => k.toLowerCase().replace(/[^a-z]/g, '') === name.toLowerCase().replace(/[^a-z]/g, ''));
-        if (found) return row[found];
+function sanitize(val: string | undefined | null): string | null {
+    if (!val) return null;
+    const v = String(val).trim();
+    const lower = v.toLowerCase();
+    if (lower === 'info requested' || lower === 'not provided' || lower === 'na' || lower === 'n/a' || lower === 'unknown' || lower === 'requested') {
+        return null;
     }
+    return v;
+}
+
+function findBestColumn(row: CSVRow, primaryKeywords: string[]): string | undefined {
+    const keys = Object.keys(row);
+    const normalizedKeys = keys.map(k => ({ original: k, clean: k.toLowerCase().replace(/[^a-z]/g, '') }));
+
+    // 1. Try exact match (any keywords)
+    for (const phrase of primaryKeywords) {
+        const target = phrase.toLowerCase().replace(/[^a-z]/g, '');
+        const found = normalizedKeys.find(k => k.clean === target);
+        if (found) return row[found.original];
+    }
+
+    // 2. Try partial match (keywords included in header)
+    for (const phrase of primaryKeywords) {
+        const target = phrase.toLowerCase().replace(/[^a-z]/g, '');
+        const found = normalizedKeys.find(k => k.clean.includes(target));
+        if (found) return row[found.original];
+    }
+
     return undefined;
 }
 
@@ -31,37 +53,45 @@ export async function processCSVImport(content: string, sourceSystem: string = '
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         try {
-            // Heuristic Column Mapping
-            const email = findColumn(row, ['email', 'e-mail', 'mail']);
-            const phone = findColumn(row, ['phone', 'mobile', 'cell', 'telephone']);
-            const firstName = findColumn(row, ['firstname', 'first name', 'given name', 'f name']);
-            const lastName = findColumn(row, ['lastname', 'last name', 'surname', 'family name']);
-            const name = findColumn(row, ['name', 'full name']); // Fallback if split names not found
+            // Priority Mapping: Attendee -> Buyer -> General
+            const attEmail = sanitize(findBestColumn(row, ['attendee email']));
+            const buyerEmail = sanitize(findBestColumn(row, ['buyer email', 'purchaser email', 'customer email']));
+            const genEmail = sanitize(findBestColumn(row, ['email', 'mail', 'e-mail']));
 
-            let finalFirst = firstName;
-            let finalLast = lastName;
+            const email = attEmail || genEmail; // We DON'T fallback to buyerEmail here to avoid merging siblings
 
-            if (!finalFirst && !finalLast && name) {
-                // Split full name if necessary
-                const parts = name.trim().split(/\s+/);
-                if (parts.length > 0) finalFirst = parts[0];
-                if (parts.length > 1) finalLast = parts.slice(1).join(' ');
+            const attFirst = sanitize(findBestColumn(row, ['attendee first name', 'attendee name']));
+            const buyerFirst = sanitize(findBestColumn(row, ['buyer first name', 'purchaser first name', 'customer first name', 'buyer name']));
+            const genFirst = sanitize(findBestColumn(row, ['firstname', 'first name', 'given name']));
+
+            const attLast = sanitize(findBestColumn(row, ['attendee last name']));
+            const buyerLast = sanitize(findBestColumn(row, ['buyer last name', 'purchaser last name', 'customer last name']));
+            const genLast = sanitize(findBestColumn(row, ['lastname', 'last name', 'surname']));
+
+            const phone = sanitize(findBestColumn(row, ['phone', 'mobile', 'cell', 'telephone', 'phonenumber'])) || sanitize(findBestColumn(row, ['buyer phone', 'purchaser phone']));
+
+            let finalFirst = attFirst || genFirst || buyerFirst;
+            let finalLast = attLast || genLast || buyerLast;
+
+            // Fallback for full name columns
+            if (!finalFirst && !finalLast) {
+                const fullName = sanitize(findBestColumn(row, ['name', 'full name', 'attendee full name', 'buyer full name']));
+                if (fullName) {
+                    const parts = fullName.split(/\s+/);
+                    finalFirst = parts[0];
+                    finalLast = parts.slice(1).join(' ');
+                }
             }
 
-            // If no identifier, skip ? Or create anonymous?
-            // "Usually have email... Sometimes have phone...".
-            // If we have neither email nor phone, we can't really match or create a useful person?
-            // Requirement: "False positives are worse than missing families." implies conservative.
-            // But for Person creation: "If no match -> create a new Person".
-            // If we have just a name, we can create a person.
-
             // Transaction Data
-            const amountStr = findColumn(row, ['amount', 'price', 'value', 'total']);
-            const dateStr = findColumn(row, ['date', 'created at', 'time', 'timestamp']);
-            const typeStr = findColumn(row, ['type', 'category']) || 'unknown';
-            const description = findColumn(row, ['description', 'memo', 'note']);
+            const amountStr = findBestColumn(row, ['amount', 'price', 'ticket price', 'total', 'value']);
+            const dateStr = findBestColumn(row, ['date', 'order date', 'time', 'timestamp', 'created at', 'start date']);
+            const typeStr = findBestColumn(row, ['ticket type', 'type', 'category']) || 'unknown';
+            const description = findBestColumn(row, ['event name', 'description', 'memo', 'note', 'ticket tier']);
 
             // Match or Create Person
+            // If they have NO identifiers (email/phone), we use name + OrderID?
+            // For now, names are enough to create a Person, but we won't match them to others easily without IDs.
             let person = await findMatchingPerson({ email, phone, lastName: finalLast });
 
             if (!person) {
@@ -74,17 +104,12 @@ export async function processCSVImport(content: string, sourceSystem: string = '
                 result.createdPeople++;
             }
 
-            // Create Transaction
-            // We assume every row is a transaction of some sort?
-            // Or maybe it's just a contact list?
-            // "From CSV files (donations, event tickets, program enrollments)" -> implies transactions.
-
             // Parse Amount
             let amount: string | number = 0;
             if (amountStr) {
                 const cleaned = amountStr.replace(/[^0-9.-]/g, '');
                 if (cleaned && !isNaN(parseFloat(cleaned))) {
-                    amount = cleaned; // Pass string to preserve precision if possible, or simplified.
+                    amount = cleaned;
                 }
             }
 
