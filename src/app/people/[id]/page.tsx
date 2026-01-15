@@ -26,10 +26,10 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
     if (!person) notFound();
 
     // Metrics
-    const totalSpent = person.transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const ticketCount = person.transactions.filter(t => t.type.toLowerCase().includes('ticket')).length;
-    const programCount = person.transactions.filter(t => t.type.toLowerCase().includes('program')).length;
-    const donationCount = person.transactions.filter(t => t.type.toLowerCase().includes('donation')).length;
+    const totalSpent = person.transactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+    const ticketCount = person.transactions.filter((t: any) => t.type.toLowerCase().includes('ticket')).length;
+    const programCount = person.transactions.filter((t: any) => t.type.toLowerCase().includes('program')).length;
+    const donationCount = person.transactions.filter((t: any) => t.type.toLowerCase().includes('donation')).length;
 
     return (
         <div className="container" style={{ maxWidth: '1000px' }}>
@@ -93,7 +93,7 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                             </tr>
                         </thead>
                         <tbody>
-                            {person.transactions.map(t => (
+                            {person.transactions.map((t: any) => (
                                 <tr key={t.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                     <td style={{ padding: '0.75rem', color: '#6b7280' }}>
                                         {new Date(t.occurredAt).toLocaleDateString()}

@@ -36,7 +36,7 @@ export async function runHouseholding() {
 
     for (const [phone, group] of phoneGroups) {
         if (group.length > 1) {
-            await createFamilyForGroup(group.map(p => p.id), 'PHONE');
+            await createFamilyForGroup(group.map((p: any) => p.id), 'PHONE');
             result.familiesCreated++;
             result.peopleGrouped += group.length;
             result.byPhone++;
@@ -64,7 +64,7 @@ export async function runHouseholding() {
 
     for (const [email, group] of emailGroups) {
         if (group.length > 1) {
-            await createFamilyForGroup(group.map(p => p.id), 'EMAIL');
+            await createFamilyForGroup(group.map((p: any) => p.id), 'EMAIL');
             result.familiesCreated++;
             result.peopleGrouped += group.length;
             result.byEmail++;
@@ -102,7 +102,7 @@ export async function runHouseholding() {
         const familyName = person.lastName ? `${person.lastName} Household` : (person.firstName ? `${person.firstName}'s Household` : 'Anonymous Household');
 
         // Wrap in transaction
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: any) => {
             const family = await tx.family.create({
                 data: {
                     name: familyName
@@ -146,7 +146,7 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string) {
     // Determine Family Name
     // "Same last name -> <LastName> Family"
     // "Otherwise -> Shared Household"
-    const lastNames = new Set(people.map(p => p.lastName).filter(Boolean));
+    const lastNames = new Set(people.map((p: any) => p.lastName).filter(Boolean));
     let familyName = 'Shared Household';
     if (lastNames.size === 1) {
         familyName = `${Array.from(lastNames)[0]} Family`;
@@ -167,7 +167,7 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string) {
     // "First person -> HEAD. Others -> UNKNOWN"
     // Order by what? CreatedAt? Or just list order?
     // I'll sort by createdAt or ID.
-    const sorted = people.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const sorted = people.sort((a: any, b: any) => a.createdAt.getTime() - b.createdAt.getTime());
 
     for (let i = 0; i < sorted.length; i++) {
         const p = sorted[i];

@@ -26,15 +26,16 @@ export default async function FamilyDetail({ params }: { params: Promise<{ id: s
 
     if (!family) notFound();
 
-    // Metrics Rollup
-    const allTransactions = family.people.flatMap(p =>
-        p.transactions.map(t => ({ ...t, personName: p.firstName + ' ' + p.lastName }))
-    );
-    allTransactions.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
 
-    const totalSpent = allTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const programCount = allTransactions.filter(t => t.type.toLowerCase().includes('program')).length;
-    const ticketCount = allTransactions.filter(t => t.type.toLowerCase().includes('ticket')).length;
+    // Metrics Rollup
+    const allTransactions = family.people.flatMap((p: any) =>
+        p.transactions.map((t: any) => ({ ...t, personName: p.firstName + ' ' + p.lastName }))
+    );
+    allTransactions.sort((a: any, b: any) => b.occurredAt.getTime() - a.occurredAt.getTime());
+
+    const totalSpent = allTransactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+    const programCount = allTransactions.filter((t: any) => t.type.toLowerCase().includes('program')).length;
+    const ticketCount = allTransactions.filter((t: any) => t.type.toLowerCase().includes('ticket')).length;
 
     return (
         <div className="container" style={{ maxWidth: '1000px' }}>
@@ -67,7 +68,7 @@ export default async function FamilyDetail({ params }: { params: Promise<{ id: s
                 <div>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' }}>Members</h2>
                     <div className="card" style={{ padding: 0 }}>
-                        {family.members.map(m => (
+                        {family.members.map((m: any) => (
                             <div key={m.id} style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
                                 <div style={{ marginRight: '1rem', background: '#f3f4f6', padding: '0.5rem', borderRadius: '50%' }}>
                                     <User size={16} color="#6b7280" />
@@ -101,7 +102,7 @@ export default async function FamilyDetail({ params }: { params: Promise<{ id: s
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {allTransactions.map(t => (
+                                    {allTransactions.map((t: any) => (
                                         <tr key={t.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                             <td style={{ padding: '0.75rem', color: '#6b7280' }}>{new Date(t.occurredAt).toLocaleDateString()}</td>
                                             <td style={{ padding: '0.75rem' }}>{t.personName}</td>

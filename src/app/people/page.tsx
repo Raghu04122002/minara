@@ -37,10 +37,10 @@ export default async function PeopleList({
         take: 200 // Limit for MVP performance
     });
 
-    const peopleWithStats = people.map(p => {
-        const totalSpent = p.transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const peopleWithStats = people.map((p: any) => {
+        const totalSpent = p.transactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
         const lastActivity = p.transactions.length > 0
-            ? p.transactions.reduce((latest, t) => t.occurredAt > latest ? t.occurredAt : latest, p.transactions[0].occurredAt)
+            ? p.transactions.reduce((latest: any, t: any) => t.occurredAt > latest ? t.occurredAt : latest, p.transactions[0].occurredAt)
             : p.createdAt;
 
         return {
@@ -52,9 +52,9 @@ export default async function PeopleList({
 
     // Sort in memory
     if (sort === 'spent') {
-        peopleWithStats.sort((a, b) => b.totalSpent - a.totalSpent);
+        peopleWithStats.sort((a: any, b: any) => b.totalSpent - a.totalSpent);
     } else if (sort === 'activity') {
-        peopleWithStats.sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+        peopleWithStats.sort((a: any, b: any) => b.lastActivity.getTime() - a.lastActivity.getTime());
     } else {
         // Default fallback to array sort based on what we fetched?
         // We already sorted in DB by field if possible, but for mixed sort logic, memory is easier.
@@ -86,7 +86,7 @@ export default async function PeopleList({
                         </tr>
                     </thead>
                     <tbody>
-                        {peopleWithStats.map(p => (
+                        {peopleWithStats.map((p: any) => (
                             <tr key={p.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                                 <td style={{ padding: '0.75rem 1.5rem' }}>
                                     <Link href={`/people/${p.id}`} style={{ color: '#2563eb', fontWeight: 500, textDecoration: 'none' }}>

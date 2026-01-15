@@ -15,12 +15,12 @@ export default async function FamiliesList() {
         }
     });
 
-    const familiesWithStats = families.map(f => {
+    const familiesWithStats = families.map((f: any) => {
         // Rollup transactions from all people in family
-        const allTransactions = f.people.flatMap(p => p.transactions);
-        const totalSpent = allTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+        const allTransactions = f.people.flatMap((p: any) => p.transactions);
+        const totalSpent = allTransactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
         const lastActivity = allTransactions.length > 0
-            ? allTransactions.reduce((latest, t) => t.occurredAt > latest ? t.occurredAt : latest, allTransactions[0].occurredAt)
+            ? allTransactions.reduce((latest: any, t: any) => t.occurredAt > latest ? t.occurredAt : latest, allTransactions[0].occurredAt)
             : f.createdAt; // Default to creation if no info
 
         return {
@@ -32,7 +32,7 @@ export default async function FamiliesList() {
     });
 
     // Sort by spent desc
-    familiesWithStats.sort((a, b) => b.totalSpent - a.totalSpent);
+    familiesWithStats.sort((a: any, b: any) => b.totalSpent - a.totalSpent);
 
     return (
         <div className="container">
@@ -54,7 +54,7 @@ export default async function FamiliesList() {
                         </tr>
                     </thead>
                     <tbody>
-                        {familiesWithStats.map(f => (
+                        {familiesWithStats.map((f: any) => (
                             <tr key={f.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                                 <td style={{ padding: '0.75rem 1.5rem' }}>
                                     <Link href={`/families/${f.id}`} style={{ color: '#2563eb', fontWeight: 500, textDecoration: 'none' }}>

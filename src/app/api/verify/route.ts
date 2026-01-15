@@ -43,7 +43,7 @@ charlie@example.com,555-0101,Charlie,Smith,200,Ticket
             log.push(`ERROR: Expected 1 family, found ${families.length}`);
         } else {
             log.push(`SUCCESS: Found 1 family: "${families[0].name}"`);
-            const members = families[0].members.map(m => m.person.firstName);
+            const members = families[0].members.map((m: any) => m.person.firstName);
             log.push(`Members: ${members.join(', ')}`);
             if (members.includes('Alice') && members.includes('Charlie')) {
                 log.push('SUCCESS: Family contains Alice and Charlie (via Phone 555-0101)');
@@ -52,7 +52,7 @@ charlie@example.com,555-0101,Charlie,Smith,200,Ticket
             }
         }
 
-        const bob = people.find(p => p.firstName === 'Bob');
+        const bob = people.find((p: any) => p.firstName === 'Bob');
         if (bob && !bob.familyId) {
             log.push('SUCCESS: Bob is not in a family.');
         } else {
