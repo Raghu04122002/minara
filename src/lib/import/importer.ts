@@ -176,12 +176,45 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
 
             // Parse Date
             let occurredAt = new Date();
+            let dateInvalid = false;
             if (dateStr) {
                 const parsed = new Date(dateStr);
                 if (!isNaN(parsed.getTime())) {
                     occurredAt = parsed;
+                } else {
+                    dateInvalid = true;
                 }
             }
+
+            // --- Flagging Logic ---
+            const reasons: string[] = [];
+
+            // A) Summary Row Detection (Any cell contains keywords)
+            const summaryKeywords = ['total', 'grand total', 'summary', 'subtotal'];
+            const isSummaryRow = Object.values(row).some(val => {
+                const v = String(val).toLowerCase();
+                return summaryKeywords.some(kw => v.includes(kw));
+            });
+            if (isSummaryRow) reasons.push('SUMMARY_ROW');
+
+            // B) Missing Required Identifiers
+            if (!email && !phone && !finalFirst && !finalLast) {
+                reasons.push('MISSING_PERSON_FIELDS');
+            }
+
+            // C) Amount Anomaly
+            const ceiling = Number(process.env.ANOMALY_AMOUNT_CEILING) || 5000;
+            if (Number(amount) > ceiling) {
+                reasons.push('AMOUNT_TOO_HIGH');
+            }
+
+            // D) Invalid Date
+            if (dateInvalid) {
+                reasons.push('INVALID_DATE');
+            }
+
+            const isFlagged = reasons.length > 0;
+            const flagReason = reasons.length > 1 ? 'MULTIPLE' : (reasons[0] || null);
 
             await prisma.transaction.create({
                 data: {
@@ -192,6 +225,9 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
                     occurredAt: occurredAt,
                     sourceSystem: filename,
                     importFileId: importFile.id,
+                    sourceRowIndex: i,
+                    is_flagged: isFlagged,
+                    flag_reason: flagReason
                 }
             });
             result.createdTransactions++;

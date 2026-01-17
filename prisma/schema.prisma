@@ -49,6 +49,10 @@ model Transaction {
   importFileId String?
   importFile   RawImportFile? @relation(fields: [importFileId], references: [id])
 
+  is_flagged   Boolean  @default(false)
+  flag_reason  String?
+  sourceRowIndex Int?
+
   createdAt    DateTime @default(now())
 }
 

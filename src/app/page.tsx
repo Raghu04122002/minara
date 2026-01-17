@@ -3,7 +3,8 @@ import UploadDropzone from '@/components/UploadDropzone';
 import RunHouseholdingButton from '@/components/RunHouseholdingButton';
 import ResetDataButton from '@/components/ResetDataButton';
 import LogoutButton from '@/components/LogoutButton';
-import { Users, CreditCard, Home as HomeIcon, Settings } from 'lucide-react';
+import FlagToggle from '@/components/FlagToggle';
+import { Users, CreditCard, Home as HomeIcon, Settings, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 
@@ -23,15 +24,31 @@ function StatCard({ title, value, icon, link }: { title: string, value: string |
     );
 }
 
-export const dynamic = 'force-dynamic'; // Ensure stats define latest data
+export const dynamic = 'force-dynamic';
 
-export default async function Home() {
-    const peopleCount = await prisma.person.count();
-    const txCount = await prisma.transaction.count();
-    const familyCount = await prisma.family.count();
+export default async function Home({ searchParams }: { searchParams: Promise<{ includeFlagged?: string }> }) {
+    const params = await searchParams;
+    const includeFlagged = params.includeFlagged === 'true';
+    const where = includeFlagged ? {} : { is_flagged: false };
 
-    // Calculate total amount (might be slow if large, usually aggregate)
+    const peopleCount = await prisma.person.count({
+        where: includeFlagged ? {} : {
+            transactions: {
+                some: { is_flagged: false }
+            }
+        }
+    });
+    const txCount = await prisma.transaction.count({ where });
+    const familyCount = await prisma.family.count({
+        where: includeFlagged ? {} : {
+            transactions: {
+                some: { is_flagged: false }
+            }
+        }
+    });
+
     const totalAmount = await prisma.transaction.aggregate({
+        where,
         _sum: { amount: true }
     });
 
@@ -57,6 +74,14 @@ export default async function Home() {
                     <LogoutButton />
                 </div>
             </header>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px' }}>
+                <FlagToggle initialChecked={includeFlagged} />
+                <Link href="/flagged" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+                    <AlertTriangle size={16} />
+                    Review Anomalies &rarr;
+                </Link>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
                 <StatCard

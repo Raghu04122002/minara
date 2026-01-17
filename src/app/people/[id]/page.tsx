@@ -26,10 +26,16 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
     if (!person) notFound();
 
     // Metrics
-    const totalSpent = person.transactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-    const ticketCount = person.transactions.filter((t: any) => t.type.toLowerCase().includes('ticket')).length;
-    const programCount = person.transactions.filter((t: any) => t.type.toLowerCase().includes('program')).length;
-    const donationCount = person.transactions.filter((t: any) => t.type.toLowerCase().includes('donation')).length;
+    const flaggedCount = person.transactions.filter((t: any) => t.is_flagged).length;
+    const activeTransactions = person.transactions; // Keep all for timeline
+
+    const totalSpent = person.transactions
+        .filter((t: any) => !t.is_flagged) // Exclude flagged from total
+        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+
+    const ticketCount = person.transactions.filter((t: any) => !t.is_flagged && t.type.toLowerCase().includes('ticket')).length;
+    const programCount = person.transactions.filter((t: any) => !t.is_flagged && t.type.toLowerCase().includes('program')).length;
+    const donationCount = person.transactions.filter((t: any) => !t.is_flagged && t.type.toLowerCase().includes('donation')).length;
 
     return (
         <div className="container" style={{ maxWidth: '1000px' }}>
@@ -77,7 +83,14 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                 </div>
             </div>
 
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' }}>Activity Timeline</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Activity Timeline</h2>
+                {flaggedCount > 0 && (
+                    <div style={{ fontSize: '0.875rem', background: '#fee2e2', color: '#991b1b', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontWeight: 600 }}>
+                        Flagged Transactions: {flaggedCount}
+                    </div>
+                )}
+            </div>
             <div className="card group-list">
                 {person.transactions.length === 0 ? (
                     <p style={{ color: '#6b7280', textAlign: 'center' }}>No transactions found.</p>
@@ -107,9 +120,16 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                                             {t.type}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '0.75rem' }}>{t.description}</td>
+                                    <td style={{ padding: '0.75rem' }}>
+                                        {t.description}
+                                        {t.is_flagged && (
+                                            <div style={{ fontSize: '0.65rem', color: '#dc2626', fontWeight: 700, marginTop: '0.2rem' }}>
+                                                FLAGGED: {t.flag_reason?.replace(/_/g, ' ')}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td style={{ padding: '0.75rem', color: '#6b7280', fontSize: '0.75rem' }}>{t.sourceSystem}</td>
-                                    <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 500 }}>
+                                    <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 500, color: t.is_flagged ? '#9ca3af' : 'inherit' }}>
                                         ${Number(t.amount).toFixed(2)}
                                     </td>
                                 </tr>
