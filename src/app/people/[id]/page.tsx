@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, User, Mail, Phone, Calendar } from 'lucide-react';
+import ResolveFlagButton from '@/components/ResolveFlagButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,8 +124,11 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                                     <td style={{ padding: '0.75rem' }}>
                                         {t.description}
                                         {t.is_flagged && (
-                                            <div style={{ fontSize: '0.65rem', color: '#dc2626', fontWeight: 700, marginTop: '0.2rem' }}>
-                                                FLAGGED: {t.flag_reason?.replace(/_/g, ' ')}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                                <div style={{ fontSize: '0.65rem', color: '#dc2626', fontWeight: 700 }}>
+                                                    FLAGGED: {t.flag_reason?.replace(/_/g, ' ')}
+                                                </div>
+                                                <ResolveFlagButton transactionId={t.id} />
                                             </div>
                                         )}
                                     </td>

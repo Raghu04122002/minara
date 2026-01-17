@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { ChevronLeft, AlertCircle, ExternalLink } from 'lucide-react';
+import ResolveFlagButton from '@/components/ResolveFlagButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,8 +78,9 @@ export default async function FlaggedPage() {
                                     <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.75rem' }}>
                                         {t.importFile?.filename || t.sourceSystem}
                                     </td>
-                                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                                        <Link href={`/people/${t.personId}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
+                                    <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                        <ResolveFlagButton transactionId={t.id} />
+                                        <Link href={`/people/${t.personId}`} className="btn" style={{ padding: '0.4rem 0.6rem', background: '#f3f4f6', color: '#374151' }}>
                                             <ExternalLink size={16} />
                                         </Link>
                                     </td>
