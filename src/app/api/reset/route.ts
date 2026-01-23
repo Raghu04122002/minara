@@ -5,12 +5,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST() {
     try {
-        // Use a transaction for atomic reset
+        // Use a transaction for atomic reset - order matters for foreign keys
         await prisma.$transaction([
             prisma.transaction.deleteMany({}),
             prisma.familyMember.deleteMany({}),
             prisma.person.deleteMany({}),
             prisma.family.deleteMany({}),
+            prisma.rawImportFile.deleteMany({}),
+            prisma.address.deleteMany({}),
         ]);
 
         return NextResponse.json({ success: true, message: 'Database cleared successfully' });
