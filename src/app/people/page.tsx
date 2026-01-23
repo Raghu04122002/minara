@@ -28,23 +28,31 @@ export default async function PeopleList({
     const people = await prisma.person.findMany({
         include: {
             transactions: {
-                select: { amount: true, occurredAt: true }
+                select: { amount: true, occurredAt: true, type: true }
             },
             family: {
                 select: { name: true }
             }
         },
-        take: 1000 // Increased for larger datasets
+        take: 1000
     });
 
     const peopleWithStats = people.map((p: any) => {
-        const totalSpent = p.transactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+        const ticketTransactions = p.transactions.filter((t: any) => t.type !== 'donation');
+        const donationTransactions = p.transactions.filter((t: any) => t.type === 'donation');
+
+        const totalTickets = ticketTransactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+        const totalDonations = donationTransactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+        const totalSpent = totalTickets + totalDonations;
+
         const lastActivity = p.transactions.length > 0
             ? p.transactions.reduce((latest: any, t: any) => t.occurredAt > latest ? t.occurredAt : latest, p.transactions[0].occurredAt)
             : p.createdAt;
 
         return {
             ...p,
+            totalTickets,
+            totalDonations,
             totalSpent,
             lastActivity
         };
@@ -81,7 +89,8 @@ export default async function PeopleList({
                             <th style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>Name</th>
                             <th style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>Email</th>
                             <th style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>Family</th>
-                            <th style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>Total Spent</th>
+                            <th style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>Tickets</th>
+                            <th style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>Donations</th>
                             <th style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>Last Activity</th>
                         </tr>
                     </thead>
@@ -102,7 +111,10 @@ export default async function PeopleList({
                                     ) : '-'}
                                 </td>
                                 <td style={{ padding: '0.75rem 1.5rem', textAlign: 'right', fontWeight: 500 }}>
-                                    ${p.totalSpent.toLocaleString()}
+                                    ${p.totalTickets.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '0.75rem 1.5rem', textAlign: 'right', fontWeight: 500, color: '#059669' }}>
+                                    ${p.totalDonations.toLocaleString()}
                                 </td>
                                 <td style={{ padding: '0.75rem 1.5rem', textAlign: 'right', color: '#6b7280' }}>
                                     {p.lastActivity.toLocaleDateString()}
@@ -110,7 +122,7 @@ export default async function PeopleList({
                             </tr>
                         ))}
                         {peopleWithStats.length === 0 && (
-                            <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>No people found. Import some data!</td></tr>
+                            <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>No people found. Import some data!</td></tr>
                         )}
                     </tbody>
                 </table>

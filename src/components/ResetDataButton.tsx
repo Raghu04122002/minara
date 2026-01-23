@@ -6,10 +6,18 @@ import { Trash2 } from 'lucide-react';
 export default function ResetDataButton() {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [confirmMode, setConfirmMode] = useState(false);
 
-    const handleReset = async () => {
-        if (!confirm('Are you sure you want to DELETE ALL DATA? This cannot be undone.')) return;
+    const handleClick = async () => {
+        // First click: enter confirm mode
+        if (!confirmMode) {
+            setConfirmMode(true);
+            // Auto-reset confirm mode after 3 seconds
+            setTimeout(() => setConfirmMode(false), 3000);
+            return;
+        }
 
+        // Second click: actually delete
         setLoading(true);
         setMessage('');
         try {
@@ -17,7 +25,7 @@ export default function ResetDataButton() {
             const data = await res.json();
             if (data.success) {
                 setMessage('Data cleared successfully.');
-                window.location.reload(); // Refresh stats
+                window.location.reload();
             } else {
                 setMessage('Error: ' + data.error);
             }
@@ -25,17 +33,18 @@ export default function ResetDataButton() {
             setMessage('Error resetting data.');
         } finally {
             setLoading(false);
+            setConfirmMode(false);
         }
     };
 
     return (
         <div style={{ marginTop: '1rem', textAlign: 'center' }}>
             <button
-                onClick={handleReset}
+                onClick={handleClick}
                 disabled={loading}
                 style={{
                     padding: '0.75rem 1.5rem',
-                    background: '#dc2626',
+                    background: confirmMode ? '#991b1b' : '#dc2626',
                     color: 'white',
                     border: 'none',
                     borderRadius: '0.5rem',
@@ -43,13 +52,15 @@ export default function ResetDataButton() {
                     fontWeight: 600,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.5rem'
+                    gap: '0.5rem',
+                    transition: 'background 0.2s'
                 }}
             >
                 <Trash2 size={18} />
-                {loading ? 'Deleting...' : 'Reset All Data'}
+                {loading ? 'Deleting...' : confirmMode ? 'Confirm Delete' : 'Reset All Data'}
             </button>
             {message && <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: message.includes('Error') ? 'red' : 'green' }}>{message}</p>}
         </div>
     );
 }
+

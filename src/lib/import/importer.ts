@@ -43,9 +43,11 @@ function findBestColumn(row: CSVRow, primaryKeywords: string[]): string | undefi
 
 interface ImportOptions {
     mode: 'append' | 'replace';
+    dataType?: 'event' | 'donation';
 }
 
-export async function processCSVImport(content: string, filename: string = 'Upload', options: ImportOptions = { mode: 'append' }): Promise<ImportResult> {
+export async function processCSVImport(content: string, filename: string = 'Upload', options: ImportOptions = { mode: 'append', dataType: 'event' }): Promise<ImportResult> {
+    const dataType = options.dataType || 'event';
     if (options.mode === 'replace') {
         console.log('--- Wiping DB for Replace Mode ---');
         await prisma.$transaction([
@@ -108,11 +110,29 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
                 }
             }
 
-            // Transaction Data
-            const amountStr = findBestColumn(row, ['amount', 'price', 'ticket price', 'total', 'value', 'amountpaid', 'feepaid', 'amount paid', 'fee paid', 'contribution']);
-            const dateStr = findBestColumn(row, ['date', 'order date', 'time', 'timestamp', 'created at', 'start date']);
-            const typeStr = findBestColumn(row, ['ticket type', 'type', 'category']) || 'unknown';
-            const description = findBestColumn(row, ['event name', 'description', 'memo', 'note', 'ticket tier']);
+            // Transaction Data - different fields for event vs donation
+            let amountStr: string | undefined;
+            let dateStr: string | undefined;
+            let description: string | undefined;
+            let transactionType: string;
+
+            if (dataType === 'donation') {
+                // Donation-specific field mapping - many possible column names
+                amountStr = findBestColumn(row, [
+                    'amount', 'donation amount', 'contribution', 'gift amount', 'total',
+                    'donated', 'gift', 'pledge', 'pledge amount', 'donation', 'giving amount',
+                    'net amount', 'gross amount', 'payment amount'
+                ]);
+                dateStr = findBestColumn(row, ['date', 'donation date', 'gift date', 'created at', 'timestamp', 'payment date', 'received date']);
+                description = findBestColumn(row, ['description', 'memo', 'note', 'campaign', 'fund', 'purpose', 'appeal', 'designation']);
+                transactionType = 'donation';
+            } else {
+                // Event-specific field mapping
+                amountStr = findBestColumn(row, ['amount', 'price', 'ticket price', 'total', 'value', 'amountpaid', 'feepaid', 'amount paid', 'fee paid']);
+                dateStr = findBestColumn(row, ['date', 'order date', 'time', 'timestamp', 'created at', 'start date']);
+                description = findBestColumn(row, ['event name', 'description', 'memo', 'note', 'ticket tier']);
+                transactionType = findBestColumn(row, ['ticket type', 'type', 'category']) || 'ticket';
+            }
 
             // Match or Create Person
             // Address / Household Grouping Information
@@ -158,7 +178,7 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
             } else if (addressId && !person.addressId) {
                 // Update existing person with address if missing
                 person = await prisma.person.update({
-                    where: { id: (person as any).id },
+                    where: { id: person.id },
                     data: { addressId }
                 });
             }
@@ -189,13 +209,25 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
             // --- Flagging Logic ---
             const reasons: string[] = [];
 
-            // A) Summary Row Detection (Any cell contains keywords)
+            // A) Summary Row Detection - only flag if:
+            //    - A cell value IS exactly a summary keyword (not just contains)
+            //    - OR the row has no person info AND contains a summary keyword
             const summaryKeywords = ['total', 'grand total', 'summary', 'subtotal'];
+            const hasNoPersonInfo = !email && !phone && !finalFirst && !finalLast;
+
             const isSummaryRow = Object.values(row).some(val => {
-                const v = String(val).toLowerCase();
-                return summaryKeywords.some(kw => v.includes(kw));
+                const v = String(val).toLowerCase().trim();
+                // Check if the value IS exactly a summary keyword
+                return summaryKeywords.includes(v);
             });
-            if (isSummaryRow) reasons.push('SUMMARY_ROW');
+
+            // Only flag if it's a clear summary row (exact match) OR no person info + contains keyword
+            if (isSummaryRow || (hasNoPersonInfo && Object.values(row).some(val => {
+                const v = String(val).toLowerCase();
+                return summaryKeywords.some(kw => v === kw || v.startsWith(kw + ':') || v.startsWith(kw + ' '));
+            }))) {
+                reasons.push('SUMMARY_ROW');
+            }
 
             // B) Missing Required Identifiers
             if (!email && !phone && !finalFirst && !finalLast) {
@@ -219,7 +251,7 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
             await prisma.transaction.create({
                 data: {
                     personId: person.id,
-                    type: typeStr || 'import',
+                    type: transactionType,
                     amount: amount,
                     description: description || `Imported from ${filename}`,
                     occurredAt: occurredAt,

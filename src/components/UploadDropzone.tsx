@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-// Using Lucide icons
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function UploadDropzone() {
     const router = useRouter();
     const [isUploading, setIsUploading] = useState(false);
     const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
+    const [dataType, setDataType] = useState<'event' | 'donation'>('event');
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [message, setMessage] = useState('');
 
@@ -23,6 +23,7 @@ export default function UploadDropzone() {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('mode', importMode);
+        formData.append('dataType', dataType);
 
         try {
             const res = await fetch('/api/upload', {
@@ -34,9 +35,9 @@ export default function UploadDropzone() {
             if (!res.ok) throw new Error(data.error || 'Upload failed');
 
             setStatus('success');
-            setMessage(`Processed ${data.totalRows} rows. Created ${data.createdPeople} people.`);
+            const typeLabel = dataType === 'event' ? 'attendees' : 'donations';
+            setMessage(`Processed ${data.totalRows} ${typeLabel}. Created ${data.createdPeople} people, ${data.createdTransactions} transactions.`);
 
-            // Refresh the page to show new stats
             router.refresh();
         } catch (err) {
             setStatus('error');
@@ -61,6 +62,28 @@ export default function UploadDropzone() {
             <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
                 Upload your CSV files from Eventbrite, Stripe, or other sources.
             </p>
+
+            {/* Data Type Selector */}
+            <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: '#374151' }}>
+                    Data Type
+                </label>
+                <select
+                    value={dataType}
+                    onChange={(e) => setDataType(e.target.value as 'event' | 'donation')}
+                    style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '0.375rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '1rem',
+                        minWidth: '200px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <option value="event">📅 Event (Attendees)</option>
+                    <option value="donation">💝 Donation</option>
+                </select>
+            </div>
 
             <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                 <button
@@ -99,7 +122,7 @@ export default function UploadDropzone() {
                 <label
                     htmlFor="file-upload"
                     className="btn btn-primary"
-                    style={{ pointerEvents: 'none' }} // Let input handle clicks
+                    style={{ pointerEvents: 'none' }}
                 >
                     {isUploading ? 'Uploading...' : 'Select CSV File'}
                 </label>
@@ -120,3 +143,4 @@ export default function UploadDropzone() {
         </div>
     );
 }
+

@@ -5,12 +5,17 @@ export const dynamic = 'force-dynamic';
 
 export async function POST() {
     try {
-        // Use a transaction for atomic reset - order matters for foreign keys
+        // Delete in correct order: children before parents
+        // Must handle foreign key relationships properly
         await prisma.$transaction([
+            // First: delete tables that reference others
             prisma.transaction.deleteMany({}),
             prisma.familyMember.deleteMany({}),
+            // Second: delete people (references family, address)
             prisma.person.deleteMany({}),
+            // Third: delete families
             prisma.family.deleteMany({}),
+            // Fourth: delete supporting tables
             prisma.rawImportFile.deleteMany({}),
             prisma.address.deleteMany({}),
         ]);

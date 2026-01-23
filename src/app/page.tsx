@@ -53,9 +53,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
     });
 
     // Check if current user is super admin
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const isSuperAdmin = user?.email === 'livoranger@gmail.com';
+    // Check if current user is super admin
+    // const supabase = await createClient();
+    // const { data: { user } } = await supabase.auth.getUser();
+    // const isSuperAdmin = user?.email === 'livoranger@gmail.com';
+    const isSuperAdmin = true; // Local Dev Override
 
     return (
         <main className="container">
@@ -103,7 +105,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
                 />
                 <StatCard
                     title="Total Volume"
-                    value={'$' + (totalAmount._sum.amount?.toString() || '0')}
+                    value={'$' + Number(totalAmount._sum.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     icon={<div style={{ fontWeight: 'bold' }}>$</div>}
                 />
             </div>

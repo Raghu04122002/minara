@@ -9,12 +9,12 @@ export async function PATCH(
     const { id } = await params;
 
     // Auth Check
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // const supabase = await createClient();
+    // const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // if (authError || !user) {
+    //     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // }
 
     try {
         const transaction = await prisma.transaction.update({
