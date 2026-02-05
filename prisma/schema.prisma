@@ -76,6 +76,10 @@ model Family {
   id        String   @id @default(uuid())
   name      String
   
+  // Confidence scoring for auto-householding
+  confidenceScore  Int?      // 0-100 percentage
+  confidenceReason String?   // e.g., 'email+phone', 'address only'
+  
   people    Person[]
   members   FamilyMember[]
   transactions Transaction[]
@@ -85,9 +89,10 @@ model Family {
 }
 
 model FamilyMember {
-  id        String   @id @default(uuid())
-  role      String   // HEAD, SPOUSE, CHILD, UNKNOWN
-  groupedBy String   // PHONE, EMAIL, ADDRESS
+  id               String   @id @default(uuid())
+  role             String   // HEAD, SPOUSE, CHILD, UNKNOWN
+  groupedBy        String   // PHONE, EMAIL, ADDRESS, MANUAL
+  manualAssignment Boolean  @default(false) // Phase 1B: true if manually assigned
   
   familyId  String
   family    Family   @relation(fields: [familyId], references: [id])
@@ -119,4 +124,34 @@ model Admin {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Phase 1B: Import job tracking
+model ImportJob {
+  id              String    @id @default(uuid())
+  fileName        String
+  status          String    @default("pending") // pending | processing | completed | failed
+  rowsTotal       Int       @default(0)
+  rowsSuccess     Int       @default(0)
+  rowsErrors      Int       @default(0)
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdByUserId String?
+  summaryStats    Json      @default("{}")
+  createdAt       DateTime  @default(now())
+
+  errors          ImportError[]
+}
+
+model ImportError {
+  id            String   @id @default(uuid())
+  importJobId   String
+  rowNumber     Int
+  rawRowData    Json
+  errorCode     String
+  errorMessage  String
+  fieldNames    String[] @default([])
+  createdAt     DateTime @default(now())
+
+  importJob     ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
 }

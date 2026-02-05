@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, User } from 'lucide-react';
+import DeleteFamilyButton from '@/components/DeleteFamilyButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,10 +44,15 @@ export default async function FamilyDetail({ params }: { params: Promise<{ id: s
                 <Link href="/families" style={{ display: 'inline-flex', alignItems: 'center', color: '#6b7280', textDecoration: 'none', marginBottom: '1rem' }}>
                     <ArrowLeft size={16} style={{ marginRight: '0.5rem' }} /> Back to Families
                 </Link>
-                <h1 className="heading" style={{ margin: 0, marginBottom: '0.5rem' }}>
-                    {family.name}
-                </h1>
-                <p style={{ color: '#6b7280' }}>Combined Household View</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                        <h1 className="heading" style={{ margin: 0, marginBottom: '0.5rem' }}>
+                            {family.name}
+                        </h1>
+                        <p style={{ color: '#6b7280', margin: 0 }}>Combined Household View</p>
+                    </div>
+                    <DeleteFamilyButton familyId={family.id} familyName={family.name} />
+                </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
@@ -78,7 +84,7 @@ export default async function FamilyDetail({ params }: { params: Promise<{ id: s
                                         {m.person.firstName} {m.person.lastName}
                                     </Link>
                                     <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                        {m.role} • Grouped by {m.groupedBy}
+                                        {m.role}
                                     </div>
                                 </div>
                             </div>

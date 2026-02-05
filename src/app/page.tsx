@@ -31,21 +31,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
     const includeFlagged = params.includeFlagged === 'true';
     const where = includeFlagged ? {} : { is_flagged: false };
 
-    const peopleCount = await prisma.person.count({
-        where: includeFlagged ? {} : {
-            transactions: {
-                some: { is_flagged: false }
-            }
-        }
-    });
+    // Count all people (not filtered by transactions)
+    const peopleCount = await prisma.person.count();
     const txCount = await prisma.transaction.count({ where });
-    const familyCount = await prisma.family.count({
-        where: includeFlagged ? {} : {
-            transactions: {
-                some: { is_flagged: false }
-            }
-        }
-    });
+    const familyCount = await prisma.family.count();
 
     const totalAmount = await prisma.transaction.aggregate({
         where,

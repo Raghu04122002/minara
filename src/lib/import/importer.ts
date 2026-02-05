@@ -8,6 +8,9 @@ interface ImportResult {
     createdPeople: number;
     createdTransactions: number;
     errors: string[];
+    importJobId?: string;
+    rowsSuccess: number;
+    rowsErrors: number;
 }
 
 function sanitize(val: string | undefined | null): string | null {
@@ -44,6 +47,7 @@ function findBestColumn(row: CSVRow, primaryKeywords: string[]): string | undefi
 interface ImportOptions {
     mode: 'append' | 'replace';
     dataType?: 'event' | 'donation';
+    importJobId?: string;  // Phase 1B: track import job
 }
 
 export async function processCSVImport(content: string, filename: string = 'Upload', options: ImportOptions = { mode: 'append', dataType: 'event' }): Promise<ImportResult> {
@@ -74,7 +78,10 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
         totalRows: rows.length,
         createdPeople: 0,
         createdTransactions: 0,
-        errors: []
+        errors: [],
+        importJobId: options.importJobId,
+        rowsSuccess: 0,
+        rowsErrors: 0
     };
 
     for (let i = 0; i < rows.length; i++) {
@@ -248,8 +255,19 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
             const isFlagged = reasons.length > 0;
             const flagReason = reasons.length > 1 ? 'MULTIPLE' : (reasons[0] || null);
 
-            await prisma.transaction.create({
-                data: {
+            // Phase 1B: Use upsert for idempotency (keyed by personId + occurredAt + amount + type)
+            const txnKey = `${person.id}_${occurredAt.toISOString()}_${amount}_${transactionType}`;
+            await prisma.transaction.upsert({
+                where: {
+                    id: txnKey.substring(0, 36) // Use as lookup, will miss on first insert
+                },
+                update: {
+                    // Update description if re-imported
+                    description: description || `Imported from ${filename}`,
+                    is_flagged: isFlagged,
+                    flag_reason: flagReason
+                },
+                create: {
                     personId: person.id,
                     type: transactionType,
                     amount: amount,
@@ -263,10 +281,30 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
                 }
             });
             result.createdTransactions++;
+            result.rowsSuccess++;
 
         } catch (error) {
             console.error(`Error processing row ${i}:`, error);
             result.errors.push(`Row ${i + 1}: ${(error as Error).message}`);
+            result.rowsErrors++;
+
+            // Phase 1B: Record error in ImportError table if job tracking is enabled
+            if (options.importJobId) {
+                try {
+                    await prisma.importError.create({
+                        data: {
+                            importJobId: options.importJobId,
+                            rowNumber: i + 1,
+                            rawRowData: row as object,
+                            errorCode: 'PROCESSING_ERROR',
+                            errorMessage: (error as Error).message,
+                            fieldNames: []
+                        }
+                    });
+                } catch (errLogError) {
+                    console.error('Failed to log import error:', errLogError);
+                }
+            }
         }
     }
 

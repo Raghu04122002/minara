@@ -6,12 +6,24 @@ export const dynamic = 'force-dynamic';
 export default async function PeopleList({
     searchParams,
 }: {
-    searchParams: { sort?: string };
+    searchParams: Promise<{ sort?: string; search?: string }>;
 }) {
-    const sort = (await searchParams).sort || 'updatedAt';
+    const params = await searchParams;
+    const sort = params.sort || 'updatedAt';
+    const search = params.search || '';
+
+    // Build search filter
+    const searchFilter = search ? {
+        OR: [
+            { firstName: { contains: search, mode: 'insensitive' as const } },
+            { lastName: { contains: search, mode: 'insensitive' as const } },
+            { email: { contains: search, mode: 'insensitive' as const } },
+            { phone: { contains: search } }
+        ]
+    } : {};
 
     // Sorting logic basic mapping
-    const orderBy: any = {};
+    const orderBy: Record<string, string> = {};
     if (sort === 'createdAt') orderBy.createdAt = 'desc';
     else if (sort === 'lastName') orderBy.lastName = 'asc';
     else orderBy.updatedAt = 'desc';
@@ -26,6 +38,7 @@ export default async function PeopleList({
     // For MVP with small CSVs, in-memory sort is acceptable.
 
     const people = await prisma.person.findMany({
+        where: searchFilter,
         include: {
             transactions: {
                 select: { amount: true, occurredAt: true, type: true }
@@ -37,16 +50,19 @@ export default async function PeopleList({
         take: 1000
     });
 
-    const peopleWithStats = people.map((p: any) => {
-        const ticketTransactions = p.transactions.filter((t: any) => t.type !== 'donation');
-        const donationTransactions = p.transactions.filter((t: any) => t.type === 'donation');
+    type Transaction = { amount: unknown; occurredAt: Date; type: string };
+    type PersonWithStats = typeof people[0] & { totalTickets: number; totalDonations: number; totalSpent: number; lastActivity: Date };
 
-        const totalTickets = ticketTransactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-        const totalDonations = donationTransactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+    const peopleWithStats: PersonWithStats[] = people.map((p: typeof people[0]) => {
+        const ticketTransactions = p.transactions.filter((t: Transaction) => t.type !== 'donation');
+        const donationTransactions = p.transactions.filter((t: Transaction) => t.type === 'donation');
+
+        const totalTickets = ticketTransactions.reduce((sum: number, t: Transaction) => sum + Number(t.amount), 0);
+        const totalDonations = donationTransactions.reduce((sum: number, t: Transaction) => sum + Number(t.amount), 0);
         const totalSpent = totalTickets + totalDonations;
 
         const lastActivity = p.transactions.length > 0
-            ? p.transactions.reduce((latest: any, t: any) => t.occurredAt > latest ? t.occurredAt : latest, p.transactions[0].occurredAt)
+            ? p.transactions.reduce((latest: Date, t: Transaction) => t.occurredAt > latest ? t.occurredAt : latest, p.transactions[0].occurredAt)
             : p.createdAt;
 
         return {
@@ -60,9 +76,9 @@ export default async function PeopleList({
 
     // Sort in memory
     if (sort === 'spent') {
-        peopleWithStats.sort((a: any, b: any) => b.totalSpent - a.totalSpent);
+        peopleWithStats.sort((a: PersonWithStats, b: PersonWithStats) => b.totalSpent - a.totalSpent);
     } else if (sort === 'activity') {
-        peopleWithStats.sort((a: any, b: any) => b.lastActivity.getTime() - a.lastActivity.getTime());
+        peopleWithStats.sort((a: PersonWithStats, b: PersonWithStats) => b.lastActivity.getTime() - a.lastActivity.getTime());
     } else {
         // Default fallback to array sort based on what we fetched?
         // We already sorted in DB by field if possible, but for mixed sort logic, memory is easier.
@@ -72,10 +88,69 @@ export default async function PeopleList({
         <div className="container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1 className="heading" style={{ margin: 0 }}>People</h1>
-                <div>
-                    <Link href="/" className="btn" style={{ marginRight: '1rem' }}>Back to Dashboard</Link>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <Link href="/people/new" style={{
+                        padding: '0.5rem 1rem',
+                        background: '#22c55e',
+                        color: '#fff',
+                        borderRadius: '0.375rem',
+                        textDecoration: 'none',
+                        fontWeight: 500
+                    }}>
+                        + Add Person
+                    </Link>
+                    <a href={`/api/people/export${search ? `?search=${encodeURIComponent(search)}` : ''}`} style={{
+                        padding: '0.5rem 1rem',
+                        background: '#f3f4f6',
+                        color: '#374151',
+                        borderRadius: '0.375rem',
+                        textDecoration: 'none',
+                        fontWeight: 500
+                    }}>
+                        Export CSV
+                    </a>
+                    <Link href="/" className="btn">Back to Dashboard</Link>
                 </div>
             </div>
+
+            {/* Search Form */}
+            <form method="GET" action="/people" style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                        type="text"
+                        name="search"
+                        defaultValue={search}
+                        placeholder="Search by name, email, or phone..."
+                        style={{
+                            flex: 1,
+                            padding: '0.5rem 1rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '0.375rem'
+                        }}
+                    />
+                    <button type="submit" style={{
+                        padding: '0.5rem 1rem',
+                        background: '#3b82f6',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        cursor: 'pointer'
+                    }}>
+                        Search
+                    </button>
+                    {search && (
+                        <Link href="/people" style={{
+                            padding: '0.5rem 1rem',
+                            background: '#f3f4f6',
+                            color: '#374151',
+                            borderRadius: '0.375rem',
+                            textDecoration: 'none'
+                        }}>
+                            Clear
+                        </Link>
+                    )}
+                </div>
+            </form>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', gap: '1rem' }}>

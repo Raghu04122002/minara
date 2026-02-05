@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, User, Mail, Phone, Calendar } from 'lucide-react';
 import ResolveFlagButton from '@/components/ResolveFlagButton';
+import AddToFamily from '@/components/AddToFamily';
+import DeletePersonButton from '@/components/DeletePersonButton';
+import EditPersonButton from '@/components/EditPersonButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,14 +57,19 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                             {person.phone && <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} style={{ marginRight: '0.5rem' }} /> {person.phone}</div>}
                         </div>
                     </div>
-                    {person.family && (
-                        <div className="card" style={{ padding: '0.75rem 1rem', background: '#eff6ff', borderColor: '#bfdbfe' }}>
-                            <div style={{ fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 600, textTransform: 'uppercase' }}>Household</div>
-                            <Link href={`/families/${person.family.id}`} style={{ fontWeight: 600, color: '#1e40af', textDecoration: 'none' }}>
-                                {person.family.name} &rarr;
-                            </Link>
-                        </div>
-                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                        {person.family && (
+                            <div className="card" style={{ padding: '0.75rem 1rem', background: '#eff6ff', borderColor: '#bfdbfe' }}>
+                                <div style={{ fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 600, textTransform: 'uppercase' }}>Household</div>
+                                <Link href={`/families/${person.family.id}`} style={{ fontWeight: 600, color: '#1e40af', textDecoration: 'none' }}>
+                                    {person.family.name} &rarr;
+                                </Link>
+                            </div>
+                        )}
+                        <AddToFamily personId={person.id} currentFamilyId={person.familyId} />
+                        <EditPersonButton personId={person.id} />
+                        <DeletePersonButton personId={person.id} personName={`${person.firstName} ${person.lastName}`} />
+                    </div>
                 </div>
             </div>
 

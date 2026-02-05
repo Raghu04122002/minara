@@ -89,6 +89,7 @@ export async function runHouseholding() {
 async function createFamilyForGroup(personIds: string[], groupedBy: string, groupKey?: string) {
     const people = await prisma.person.findMany({
         where: { id: { in: personIds } },
+        include: { address: true },
         orderBy: { createdAt: 'asc' }
     });
 
@@ -97,19 +98,18 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string, grou
     // Head is the first person (oldest record)
     const head = people[0];
 
-    // Determine Family Name: Priority is Head's Last Name
-    let familyName = head.lastName ? `${head.lastName} Family` : `${head.firstName || 'Unknown'}'s Household`;
+    // Determine Family Name: Priority is Head's Last Name (no email/phone in name)
+    const familyName = head.lastName ? `${head.lastName} Family` : `${head.firstName || 'Unknown'}'s Household`;
 
-    // Append identifier if requested
-    if (groupKey) {
-        familyName += ` (${groupKey})`;
-    }
+    // Compute confidence score based on shared identifiers
+    const { score, reason } = computeConfidenceScore(people, groupedBy);
 
-
-    // Create Family
+    // Create Family with confidence
     const family = await prisma.family.create({
         data: {
             name: familyName,
+            confidenceScore: score,
+            confidenceReason: reason,
         }
     });
 
@@ -137,4 +137,45 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string, grou
             data: { familyId: family.id }
         });
     }
+}
+
+// Compute confidence score based on shared identifiers
+function computeConfidenceScore(people: Array<{ email?: string | null; phone?: string | null; address?: { id: string } | null }>, primaryGroupedBy: string): { score: number; reason: string } {
+    // Check what identifiers are shared across ALL members
+    const hasSharedEmail = people.every(p => p.email) && new Set(people.map(p => p.email?.toLowerCase())).size === 1;
+    const hasSharedPhone = people.every(p => p.phone) && new Set(people.map(p => p.phone)).size === 1;
+    const hasSharedAddress = people.every(p => p.address?.id) && new Set(people.map(p => p.address?.id)).size === 1;
+
+    // Scoring rules based on the spec
+    let score: number;
+    let reason: string;
+
+    if (hasSharedEmail && hasSharedPhone && hasSharedAddress) {
+        score = 95;
+        reason = 'email+phone+address';
+    } else if (hasSharedEmail && hasSharedPhone) {
+        score = 92;
+        reason = 'email+phone';
+    } else if (hasSharedEmail && hasSharedAddress) {
+        score = 90;
+        reason = 'email+address';
+    } else if (hasSharedPhone && hasSharedAddress) {
+        score = 88;
+        reason = 'phone+address';
+    } else if (hasSharedEmail) {
+        score = 85;
+        reason = 'email only';
+    } else if (hasSharedPhone) {
+        score = 82;
+        reason = 'phone only';
+    } else if (hasSharedAddress) {
+        score = 75;
+        reason = 'address only';
+    } else {
+        // Fallback based on primary grouped by
+        score = 60;
+        reason = primaryGroupedBy.toLowerCase();
+    }
+
+    return { score, reason };
 }
