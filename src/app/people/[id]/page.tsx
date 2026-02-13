@@ -6,6 +6,7 @@ import ResolveFlagButton from '@/components/ResolveFlagButton';
 import AddToFamily from '@/components/AddToFamily';
 import DeletePersonButton from '@/components/DeletePersonButton';
 import EditPersonButton from '@/components/EditPersonButton';
+import FlagPersonButton from '@/components/FlagPersonButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +68,7 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                             </div>
                         )}
                         <AddToFamily personId={person.id} currentFamilyId={person.familyId} />
+                        <FlagPersonButton personId={person.id} personName={`${person.firstName} ${person.lastName}`} />
                         <EditPersonButton personId={person.id} />
                         <DeletePersonButton personId={person.id} personName={`${person.firstName} ${person.lastName}`} />
                     </div>

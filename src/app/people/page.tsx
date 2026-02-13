@@ -50,6 +50,8 @@ export default async function PeopleList({
         take: 1000
     });
 
+    const flaggedCount = await prisma.person.count({ where: { is_flagged: true } });
+
     type Transaction = { amount: unknown; occurredAt: Date; type: string };
     type PersonWithStats = typeof people[0] & { totalTickets: number; totalDonations: number; totalSpent: number; lastActivity: Date };
 
@@ -98,6 +100,17 @@ export default async function PeopleList({
                         fontWeight: 500
                     }}>
                         + Add Person
+                    </Link>
+                    <Link href="/people/flagged" style={{
+                        padding: '0.5rem 1rem',
+                        background: flaggedCount > 0 ? '#fef3c7' : '#f3f4f6',
+                        color: flaggedCount > 0 ? '#92400e' : '#374151',
+                        borderRadius: '0.375rem',
+                        textDecoration: 'none',
+                        fontWeight: 500,
+                        border: flaggedCount > 0 ? '1px solid #fcd34d' : 'none'
+                    }}>
+                        🚩 Flagged ({flaggedCount})
                     </Link>
                     <a href={`/api/people/export${search ? `?search=${encodeURIComponent(search)}` : ''}`} style={{
                         padding: '0.5rem 1rem',
@@ -176,6 +189,19 @@ export default async function PeopleList({
                                     <Link href={`/people/${p.id}`} style={{ color: '#2563eb', fontWeight: 500, textDecoration: 'none' }}>
                                         {p.firstName || ''} {p.lastName || 'Person ' + p.id.substring(0, 6)}
                                     </Link>
+                                    {p.is_flagged && (
+                                        <span style={{
+                                            marginLeft: '0.5rem',
+                                            padding: '0.125rem 0.375rem',
+                                            background: '#fee2e2',
+                                            color: '#dc2626',
+                                            borderRadius: '0.25rem',
+                                            fontSize: '0.65rem',
+                                            fontWeight: 700
+                                        }}>
+                                            🚩 FLAGGED
+                                        </span>
+                                    )}
                                 </td>
                                 <td style={{ padding: '0.75rem 1.5rem', color: '#6b7280' }}>{p.email || '-'}</td>
                                 <td style={{ padding: '0.75rem 1.5rem' }}>

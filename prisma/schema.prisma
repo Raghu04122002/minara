@@ -27,6 +27,13 @@ model Person {
 
   transactions Transaction[]
   memberships  FamilyMember[]
+  flags        PersonFlag[]
+
+  // Flagging
+  is_flagged         Boolean   @default(false)
+  flag_reason        String?
+  flagged_at         DateTime?
+  mergedFromPersonId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -154,4 +161,25 @@ model ImportError {
   createdAt     DateTime @default(now())
 
   importJob     ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+}
+
+model PersonFlag {
+  id                String    @id @default(uuid())
+  actionType        String    @default("flag") // flag, merge
+  reason            String    // missing_details, repeated_person, summary_row, other
+  notes             String?
+  snapshot          Json?     // snapshot of person data for undo
+  duplicatePersonId String?   // legacy field
+  targetPersonId    String?   // for merges: the surviving person id
+
+  personId          String?
+  person            Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  undoneAt                  DateTime?
+  undoneByUserId            String?
+  permanentlyDeletedAt      DateTime?
+  permanentlyDeletedByUserId String?
+
+  createdAt         DateTime  @default(now())
+  createdByUserId   String?
 }

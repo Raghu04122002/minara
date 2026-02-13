@@ -35,6 +35,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
     const peopleCount = await prisma.person.count();
     const txCount = await prisma.transaction.count({ where });
     const familyCount = await prisma.family.count();
+    const flaggedPeopleCount = await prisma.person.count({ where: { is_flagged: true } });
 
     const totalAmount = await prisma.transaction.aggregate({
         where,
@@ -96,6 +97,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
                     title="Total Volume"
                     value={'$' + Number(totalAmount._sum.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     icon={<div style={{ fontWeight: 'bold' }}>$</div>}
+                />
+                <StatCard
+                    title="Flagged People"
+                    value={flaggedPeopleCount.toLocaleString()}
+                    icon={<AlertTriangle size={24} />}
+                    link="/people/flagged"
                 />
             </div>
 
