@@ -11,6 +11,7 @@ export async function POST() {
             // First: delete tables that reference others
             prisma.transaction.deleteMany({}),
             prisma.familyMember.deleteMany({}),
+            prisma.personFlag.deleteMany({}),
             // Second: delete people (references family, address)
             prisma.person.deleteMany({}),
             // Third: delete families
