@@ -17,14 +17,22 @@ export const metadata: Metadata = {
   description: "Engagement Insights Dashboard",
 };
 
-export default function RootLayout({
+import { createClient } from "@/lib/supabase/server";
+import SecurityGuard from "@/components/SecurityGuard";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isRestricted = user?.email === 'miftaah@minara.org.in';
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <SecurityGuard isRestricted={isRestricted} />
         {children}
       </body>
     </html>

@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -8,6 +9,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function FamilyDetail({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    // Check user role
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const isMiftaah = user?.email === 'miftaah@minara.org.in';
+    const isSuperAdmin = !isMiftaah;
+
     const family = await prisma.family.findUnique({
         where: { id },
         include: {
@@ -51,7 +59,7 @@ export default async function FamilyDetail({ params }: { params: Promise<{ id: s
                         </h1>
                         <p style={{ color: '#6b7280', margin: 0 }}>Combined Household View</p>
                     </div>
-                    <DeleteFamilyButton familyId={family.id} familyName={family.name} />
+                    {isSuperAdmin && <DeleteFamilyButton familyId={family.id} familyName={family.name} />}
                 </div>
             </div>
 

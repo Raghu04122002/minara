@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 
@@ -9,6 +10,13 @@ export default async function PeopleList({
     searchParams: Promise<{ sort?: string; search?: string }>;
 }) {
     const params = await searchParams;
+
+    // Check user role
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const isMiftaah = user?.email === 'miftaah@minara.org.in';
+    const isSuperAdmin = !isMiftaah;
+
     const sort = params.sort || 'updatedAt';
     const search = params.search || '';
 
@@ -91,37 +99,41 @@ export default async function PeopleList({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1 className="heading" style={{ margin: 0 }}>People</h1>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Link href="/people/new" style={{
-                        padding: '0.5rem 1rem',
-                        background: '#22c55e',
-                        color: '#fff',
-                        borderRadius: '0.375rem',
-                        textDecoration: 'none',
-                        fontWeight: 500
-                    }}>
-                        + Add Person
-                    </Link>
-                    <Link href="/people/flagged" style={{
-                        padding: '0.5rem 1rem',
-                        background: flaggedCount > 0 ? '#fef3c7' : '#f3f4f6',
-                        color: flaggedCount > 0 ? '#92400e' : '#374151',
-                        borderRadius: '0.375rem',
-                        textDecoration: 'none',
-                        fontWeight: 500,
-                        border: flaggedCount > 0 ? '1px solid #fcd34d' : 'none'
-                    }}>
-                        🚩 Flagged ({flaggedCount})
-                    </Link>
-                    <a href={`/api/people/export${search ? `?search=${encodeURIComponent(search)}` : ''}`} style={{
-                        padding: '0.5rem 1rem',
-                        background: '#f3f4f6',
-                        color: '#374151',
-                        borderRadius: '0.375rem',
-                        textDecoration: 'none',
-                        fontWeight: 500
-                    }}>
-                        Export CSV
-                    </a>
+                    {isSuperAdmin && (
+                        <>
+                            <Link href="/people/new" style={{
+                                padding: '0.5rem 1rem',
+                                background: '#22c55e',
+                                color: '#fff',
+                                borderRadius: '0.375rem',
+                                textDecoration: 'none',
+                                fontWeight: 500
+                            }}>
+                                + Add Person
+                            </Link>
+                            <Link href="/people/flagged" style={{
+                                padding: '0.5rem 1rem',
+                                background: flaggedCount > 0 ? '#fef3c7' : '#f3f4f6',
+                                color: flaggedCount > 0 ? '#92400e' : '#374151',
+                                borderRadius: '0.375rem',
+                                textDecoration: 'none',
+                                fontWeight: 500,
+                                border: flaggedCount > 0 ? '1px solid #fcd34d' : 'none'
+                            }}>
+                                🚩 Flagged ({flaggedCount})
+                            </Link>
+                            <a href={`/api/people/export${search ? `?search=${encodeURIComponent(search)}` : ''}`} style={{
+                                padding: '0.5rem 1rem',
+                                background: '#f3f4f6',
+                                color: '#374151',
+                                borderRadius: '0.375rem',
+                                textDecoration: 'none',
+                                fontWeight: 500
+                            }}>
+                                Export CSV
+                            </a>
+                        </>
+                    )}
                     <Link href="/" className="btn">Back to Dashboard</Link>
                 </div>
             </div>
@@ -189,7 +201,7 @@ export default async function PeopleList({
                                     <Link href={`/people/${p.id}`} style={{ color: '#2563eb', fontWeight: 500, textDecoration: 'none' }}>
                                         {p.firstName || ''} {p.lastName || 'Person ' + p.id.substring(0, 6)}
                                     </Link>
-                                    {p.is_flagged && (
+                                    {p.is_flagged && isSuperAdmin && (
                                         <span style={{
                                             marginLeft: '0.5rem',
                                             padding: '0.125rem 0.375rem',

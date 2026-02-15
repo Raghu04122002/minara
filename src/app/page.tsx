@@ -42,18 +42,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
         _sum: { amount: true }
     });
 
-    // Check if current user is super admin
-    // Check if current user is super admin
-    // const supabase = await createClient();
-    // const { data: { user } } = await supabase.auth.getUser();
-    // const isSuperAdmin = user?.email === 'livoranger@gmail.com';
-    const isSuperAdmin = true; // Local Dev Override
+    // Check user role
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const userEmail = user?.email;
+    const isMiftaah = userEmail === 'miftaah@minara.org.in';
+    const isSuperAdmin = !isMiftaah; // For now, everyone else is super admin in this MVP
 
     return (
         <main className="container">
             <header style={{ marginBottom: '3rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#111827', marginBottom: '0.25rem' }}>Minara Admin</h1>
+                    <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#111827', marginBottom: '0.25rem' }}>
+                        {isMiftaah ? 'Miftaah by Minara' : 'Minara Admin'}
+                    </h1>
                     <p style={{ color: '#6b7280', margin: 0 }}>Engagement Insights Validation MVP</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -69,10 +71,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px' }}>
                 <FlagToggle initialChecked={includeFlagged} />
-                <Link href="/flagged" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
-                    <AlertTriangle size={16} />
-                    Review Anomalies &rarr;
-                </Link>
+                {isSuperAdmin && (
+                    <Link href="/flagged" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+                        <AlertTriangle size={16} />
+                        Review Anomalies &rarr;
+                    </Link>
+                )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
@@ -98,18 +102,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
                     value={'$' + Number(totalAmount._sum.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     icon={<div style={{ fontWeight: 'bold' }}>$</div>}
                 />
-                <StatCard
-                    title="Flagged People"
-                    value={flaggedPeopleCount.toLocaleString()}
-                    icon={<AlertTriangle size={24} />}
-                    link="/people/flagged"
-                />
+                {isSuperAdmin && (
+                    <StatCard
+                        title="Flagged People"
+                        value={flaggedPeopleCount.toLocaleString()}
+                        icon={<AlertTriangle size={24} />}
+                        link="/people/flagged"
+                    />
+                )}
             </div>
 
             <div style={{ maxWidth: '600px', margin: '0 auto' }}>
                 <UploadDropzone />
                 <RunHouseholdingButton />
-                <ResetDataButton />
+                {isSuperAdmin && <ResetDataButton />}
             </div>
         </main>
     );

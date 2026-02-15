@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 
@@ -12,6 +13,12 @@ function getConfidenceStyle(score: number | null): { bg: string; color: string; 
 }
 
 export default async function FamiliesList() {
+    // Check user role
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const isMiftaah = user?.email === 'miftaah@minara.org.in';
+    const isSuperAdmin = !isMiftaah;
+
     const families = await prisma.family.findMany({
         include: {
             people: {
@@ -53,7 +60,7 @@ export default async function FamiliesList() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1 className="heading" style={{ margin: 0 }}>Families</h1>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Link href="/families/new" className="btn" style={{ background: '#22c55e', color: 'white' }}>+ Create Family</Link>
+                    {isSuperAdmin && <Link href="/families/new" className="btn" style={{ background: '#22c55e', color: 'white' }}>+ Create Family</Link>}
                     <Link href="/" className="btn">Back to Dashboard</Link>
                 </div>
             </div>
@@ -81,7 +88,7 @@ export default async function FamiliesList() {
                                     </td>
                                     <td style={{ padding: '0.75rem 1.5rem' }}>
                                         <span
-                                            title={f.confidenceReason ? `Confidence based on: ${f.confidenceReason}` : 'Confidence based on shared email, phone, and/or address.'}
+                                            title={isSuperAdmin ? (f.confidenceReason ? `Confidence based on: ${f.confidenceReason}` : 'Confidence based on shared email, phone, and/or address.') : undefined}
                                             style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',

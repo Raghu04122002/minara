@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -12,6 +13,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function PersonDetail({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    // Check user role
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const isRestricted = user?.email === 'miftaah@minara.org.in';
+    const isSuperAdmin = !isRestricted;
+
     const person = await prisma.person.findUnique({
         where: { id },
         include: {
@@ -67,10 +75,14 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                                 </Link>
                             </div>
                         )}
-                        <AddToFamily personId={person.id} currentFamilyId={person.familyId} />
-                        <FlagPersonButton personId={person.id} personName={`${person.firstName} ${person.lastName}`} />
-                        <EditPersonButton personId={person.id} />
-                        <DeletePersonButton personId={person.id} personName={`${person.firstName} ${person.lastName}`} />
+                        {isSuperAdmin && (
+                            <>
+                                <AddToFamily personId={person.id} currentFamilyId={person.familyId} />
+                                <FlagPersonButton personId={person.id} personName={`${person.firstName} ${person.lastName}`} />
+                                <EditPersonButton personId={person.id} />
+                                <DeletePersonButton personId={person.id} personName={`${person.firstName} ${person.lastName}`} />
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -138,7 +150,7 @@ export default async function PersonDetail({ params }: { params: Promise<{ id: s
                                                 <div style={{ fontSize: '0.65rem', color: '#dc2626', fontWeight: 700 }}>
                                                     FLAGGED: {t.flag_reason?.replace(/_/g, ' ')}
                                                 </div>
-                                                <ResolveFlagButton transactionId={t.id} />
+                                                {isSuperAdmin && <ResolveFlagButton transactionId={t.id} />}
                                             </div>
                                         )}
                                     </td>
