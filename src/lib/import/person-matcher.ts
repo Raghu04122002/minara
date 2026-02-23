@@ -8,6 +8,7 @@ interface PersonInput {
     firstName?: string | null;
     lastName?: string | null;
     addressId?: string | null;
+    institutionId?: string; // Required by schema
 }
 
 /**
@@ -34,7 +35,7 @@ export async function findMatchingPerson(
     if (cleanEmail) {
         const potentialMatches = await prisma.person.findMany({
             where: {
-                email: cleanEmail
+                primaryEmail: cleanEmail
             }
         });
 
@@ -53,7 +54,7 @@ export async function findMatchingPerson(
     if (normalizedPhoneValue) {
         const potentialMatches = await prisma.person.findMany({
             where: {
-                phone: normalizedPhoneValue
+                primaryPhone: normalizedPhoneValue
             }
         });
 
@@ -71,7 +72,7 @@ export async function findMatchingPerson(
     if (cleanEmail && lastName && lastName.trim()) {
         const potentialMatches = await prisma.person.findMany({
             where: {
-                email: cleanEmail
+                primaryEmail: cleanEmail
             }
         });
         const match = potentialMatches.find((p: Person) =>
@@ -88,16 +89,18 @@ export async function findMatchingPerson(
 }
 
 export async function createPerson(input: PersonInput): Promise<Person> {
-    const { email, phone, firstName, lastName, addressId } = input;
+    const { email, phone, firstName, lastName, addressId, institutionId } = input;
     const normalizedPhoneValue = normalizePhone(phone);
 
     return await prisma.person.create({
         data: {
-            email: email ? email.trim().toLowerCase() : null,
-            phone: normalizedPhoneValue,
+            institutionId: institutionId || 'unassigned',
+            primaryEmail: email ? email.trim().toLowerCase() : null,
+            primaryPhone: normalizedPhoneValue,
             firstName: firstName ? firstName.trim() : null,
             lastName: lastName ? lastName.trim() : null,
             addressId: addressId,
+            createdSource: 'import'
         }
     });
 }

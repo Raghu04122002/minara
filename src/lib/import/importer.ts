@@ -56,9 +56,9 @@ export async function processCSVImport(content: string, filename: string = 'Uplo
         console.log('--- Wiping DB for Replace Mode ---');
         await prisma.$transaction([
             prisma.transaction.deleteMany({}),
-            prisma.familyMember.deleteMany({}),
+            prisma.householdMember.deleteMany({}),
             prisma.person.deleteMany({}),
-            prisma.family.deleteMany({}),
+            prisma.household.deleteMany({}),
             prisma.rawImportFile.deleteMany({}),
         ]);
     }

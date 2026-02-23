@@ -17,7 +17,7 @@ export default function RunHouseholdingButton() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            setResult(`Created ${data.familiesCreated} families from ${data.peopleGrouped} people.`);
+            setResult(`Created ${data.familiesCreated} households from ${data.peopleGrouped} people.`);
             router.refresh();
         } catch (err) {
             setResult(`Error: ${(err as Error).message}`);

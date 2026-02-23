@@ -65,13 +65,14 @@ export async function POST(
             await prisma.person.create({
                 data: {
                     id: personData.id,
+                    institutionId: 'unassigned', // Required
+                    createdSource: 'system', // Required
                     firstName: personData.firstName,
                     lastName: personData.lastName,
-                    email: personData.email,
-                    phone: personData.phone,
+                    primaryEmail: personData.email,
+                    primaryPhone: personData.phone,
                     normalizedEmail: personData.normalizedEmail,
                     normalizedPhone: personData.normalizedPhone,
-                    familyId: personData.familyId,
                     addressId: personData.addressId
                 }
             });
@@ -84,26 +85,26 @@ export async function POST(
                 });
             }
 
-            // C. Recreate family memberships
+            // C. Recreate household memberships
             for (const membership of memberships) {
                 // Check if this membership still exists (it was either moved or deleted)
-                const existing = await prisma.familyMember.findUnique({
+                const existing = await prisma.householdMember.findUnique({
                     where: { id: membership.id }
                 });
 
                 if (existing) {
                     // It was moved to target person — move it back
-                    await prisma.familyMember.update({
+                    await prisma.householdMember.update({
                         where: { id: membership.id },
                         data: { personId: personData.id }
                     });
                 } else {
-                    // It was deleted (target already had membership in that family) — recreate
-                    await prisma.familyMember.create({
+                    // It was deleted (target already had membership in that household) — recreate
+                    await prisma.householdMember.create({
                         data: {
                             personId: personData.id,
-                            familyId: membership.familyId,
-                            role: membership.role,
+                            householdId: membership.householdId,
+                            roleInHousehold: membership.role,
                             groupedBy: membership.groupedBy,
                             manualAssignment: membership.manualAssignment
                         }

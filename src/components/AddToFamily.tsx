@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface Family {
+interface Household {
     id: string;
     name: string;
 }
@@ -15,7 +15,7 @@ interface AddToFamilyProps {
 
 export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyProps) {
     const router = useRouter();
-    const [families, setFamilies] = useState<Family[]>([]);
+    const [households, setFamilies] = useState<Household[]>([]);
     const [loading, setLoading] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -37,37 +37,37 @@ export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyPr
         setLoading(true);
 
         try {
-            let familyId = selectedFamilyId;
+            let householdId = selectedFamilyId;
 
-            // Create new family if needed
+            // Create new household if needed
             if (mode === 'new' && newFamilyName) {
                 const res = await fetch('/api/families', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newFamilyName })
+                    body: JSON.stringify({ householdName: newFamilyName })
                 });
-                const family = await res.json();
-                familyId = family.id;
+                const household = await res.json();
+                householdId = household.id;
             }
 
-            if (!familyId) {
-                alert('Please select or create a family');
+            if (!householdId) {
+                alert('Please select or create a household');
                 setLoading(false);
                 return;
             }
 
-            // Add person to family
-            await fetch(`/api/families/${familyId}/members`, {
+            // Add person to household
+            await fetch(`/api/families/${householdId}/members`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ personId, role: 'UNKNOWN' })
+                body: JSON.stringify({ personId, roleInHousehold: 'guest' })
             });
 
             setShowForm(false);
             router.refresh();
         } catch (error) {
             console.error('Error:', error);
-            alert('Failed to add to family');
+            alert('Failed to add to household');
         } finally {
             setLoading(false);
         }
@@ -85,7 +85,7 @@ export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyPr
             router.refresh();
         } catch (error) {
             console.error('Error:', error);
-            alert('Failed to remove from family');
+            alert('Failed to remove from household');
         } finally {
             setLoading(false);
         }
@@ -104,7 +104,7 @@ export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyPr
                 border: '1px solid #fecaca'
             }}>
                 <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#991b1b' }}>
-                    Remove from family?
+                    Remove from household?
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#dc2626' }}>
                     This person will be unlinked from the household.
@@ -161,7 +161,7 @@ export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyPr
                         fontSize: '0.875rem'
                     }}
                 >
-                    {currentFamilyId ? 'Change Family' : '+ Add to Family'}
+                    {currentFamilyId ? 'Change Household' : '+ Add to Household'}
                 </button>
                 {currentFamilyId && (
                     <button
@@ -201,7 +201,7 @@ export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyPr
                             onChange={() => setMode('existing')}
                             style={{ marginRight: '0.5rem' }}
                         />
-                        Add to existing family
+                        Add to existing household
                     </label>
                     {mode === 'existing' && (
                         <select
@@ -214,8 +214,8 @@ export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyPr
                                 border: '1px solid #d1d5db'
                             }}
                         >
-                            <option value="">Select a family...</option>
-                            {families.map(f => (
+                            <option value="">Select a household...</option>
+                            {households.map(f => (
                                 <option key={f.id} value={f.id}>{f.name}</option>
                             ))}
                         </select>
@@ -230,14 +230,14 @@ export default function AddToFamily({ personId, currentFamilyId }: AddToFamilyPr
                             onChange={() => setMode('new')}
                             style={{ marginRight: '0.5rem' }}
                         />
-                        Create new family
+                        Create new household
                     </label>
                     {mode === 'new' && (
                         <input
                             type="text"
                             value={newFamilyName}
                             onChange={(e) => setNewFamilyName(e.target.value)}
-                            placeholder="Family name (e.g., Smith Family)"
+                            placeholder="Household name (e.g., Smith Household)"
                             style={{
                                 width: '100%',
                                 padding: '0.5rem',

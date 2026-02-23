@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
             OR: [
                 { firstName: { contains: search, mode: 'insensitive' as const } },
                 { lastName: { contains: search, mode: 'insensitive' as const } },
-                { email: { contains: search, mode: 'insensitive' as const } },
-                { phone: { contains: search } }
+                { primaryEmail: { contains: search, mode: 'insensitive' as const } },
+                { primaryPhone: { contains: search } }
             ]
         } : {};
 
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
         const rows = people.map((p: typeof people[0]) => [
             p.firstName || '',
             p.lastName || '',
-            p.email || '',
-            p.phone || '',
+            p.primaryEmail || '',
+            p.primaryPhone || '',
             p._count.transactions.toString()
         ].map(v => `"${v.replace(/"/g, '""')}"`).join(','));
 

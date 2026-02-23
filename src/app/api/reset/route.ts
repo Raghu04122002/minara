@@ -8,17 +8,23 @@ export async function POST() {
         // Delete in correct order: children before parents
         // Must handle foreign key relationships properly
         await prisma.$transaction([
-            // First: delete tables that reference others
+            // Phase 1B tables (children before parents)
+            prisma.eventParticipation.deleteMany({}),
+            prisma.registrationParticipant.deleteMany({}),
+            prisma.order.deleteMany({}),
+            prisma.registrationSubmission.deleteMany({}),
+            prisma.ticketTier.deleteMany({}),
+            prisma.event.deleteMany({}),
+            // Original tables (children before parents)
             prisma.transaction.deleteMany({}),
-            prisma.familyMember.deleteMany({}),
+            prisma.householdMember.deleteMany({}),
             prisma.personFlag.deleteMany({}),
-            // Second: delete people (references family, address)
+            prisma.importJob.deleteMany({}),
             prisma.person.deleteMany({}),
-            // Third: delete families
-            prisma.family.deleteMany({}),
-            // Fourth: delete supporting tables
+            prisma.household.deleteMany({}),
             prisma.rawImportFile.deleteMany({}),
             prisma.address.deleteMany({}),
+            prisma.institution.deleteMany({}),
         ]);
 
         return NextResponse.json({ success: true, message: 'Database cleared successfully' });

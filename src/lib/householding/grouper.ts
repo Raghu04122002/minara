@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { Person, Family, FamilyMember } from '@prisma/client';
+import { Person, Household, HouseholdMember } from '@prisma/client';
 
 export async function runHouseholding() {
     const log: string[] = [];
@@ -11,41 +11,40 @@ export async function runHouseholding() {
         logs: log,
     };
 
-    // Wipe existing families to recompute from scratch (Phase 1A recomputation)
-    console.log('--- Wiping existing families for recomputation ---');
+    // Wipe existing households to recompute from scratch (Phase 1A recomputation)
+    console.log('--- Wiping existing households for recomputation ---');
     await prisma.$transaction([
-        prisma.familyMember.deleteMany({}),
-        prisma.transaction.updateMany({ data: { familyId: null } }),
-        prisma.person.updateMany({ data: { familyId: null } }),
-        prisma.family.deleteMany({}),
+        prisma.householdMember.deleteMany({}),
+        prisma.transaction.updateMany({ data: { householdId: null } }),
+        prisma.household.deleteMany({}),
     ]);
 
     // 1. Group by Phone
     // Get all people with phone, grouped by phone
     const peopleWithPhone = await prisma.person.findMany({
         where: {
-            phone: { not: null },
-            familyId: null // Only group ungrouped people?
+            primaryPhone: { not: null },
+            householdMembers: { none: {} } // Only group ungrouped people
             // Requirement: "Householding runs AFTER all CSVs".
-            // Assuming we want to group everyone. If someone is already in a family, do we move them?
+            // Assuming we want to group everyone. If someone is already in a household, do we move them?
             // "Incorrect merges are not acceptable".
-            // Safest: Only group people who are NOT in a family.
+            // Safest: Only group people who are NOT in a household.
         },
-        select: { id: true, phone: true, lastName: true }
+        select: { id: true, primaryPhone: true, lastName: true }
     });
 
     const phoneGroups = new Map<string, typeof peopleWithPhone>();
     for (const p of peopleWithPhone) {
-        if (!p.phone) continue;
-        const group = phoneGroups.get(p.phone) || [];
+        if (!p.primaryPhone) continue;
+        const group = phoneGroups.get(p.primaryPhone) || [];
         group.push(p);
-        phoneGroups.set(p.phone, group);
+        phoneGroups.set(p.primaryPhone, group);
     }
 
     for (const [phone, group] of phoneGroups) {
         const uniqueIds = Array.from(new Set(group.map((p: any) => p.id as string)));
         if (uniqueIds.length > 1) {
-            await createFamilyForGroup(uniqueIds as string[], 'PHONE', phone);
+            await createHouseholdForGroup(uniqueIds as string[], 'PHONE', phone);
             result.familiesCreated++;
             result.peopleGrouped += uniqueIds.length;
             result.byPhone++;
@@ -55,16 +54,16 @@ export async function runHouseholding() {
     // 2. Group by Email
     const peopleWithEmail = await prisma.person.findMany({
         where: {
-            email: { not: null },
-            familyId: null
+            primaryEmail: { not: null },
+            householdMembers: { none: {} }
         },
-        select: { id: true, email: true, lastName: true }
+        select: { id: true, primaryEmail: true, lastName: true }
     });
 
     const emailGroups = new Map<string, typeof peopleWithEmail>();
     for (const p of peopleWithEmail) {
-        if (!p.email) continue;
-        const key = p.email.toLowerCase().trim();
+        if (!p.primaryEmail) continue;
+        const key = p.primaryEmail.toLowerCase().trim();
         const group = emailGroups.get(key) || [];
         group.push(p);
         emailGroups.set(key, group);
@@ -74,19 +73,19 @@ export async function runHouseholding() {
         // Ensure we have at least 2 UNIQUE people
         const uniqueIds = Array.from(new Set(group.map((p: any) => p.id as string)));
         if (uniqueIds.length > 1) {
-            await createFamilyForGroup(uniqueIds as string[], 'EMAIL', email);
+            await createHouseholdForGroup(uniqueIds as string[], 'EMAIL', email);
             result.familiesCreated++;
             result.peopleGrouped += uniqueIds.length;
             result.byEmail++;
         }
     }
 
-    log.push(`Grouping complete. ${result.familiesCreated} families created in total.`);
+    log.push(`Grouping complete. ${result.familiesCreated} households created in total.`);
 
     return result;
 }
 
-async function createFamilyForGroup(personIds: string[], groupedBy: string, groupKey?: string) {
+async function createHouseholdForGroup(personIds: string[], groupedBy: string, groupKey?: string) {
     const people = await prisma.person.findMany({
         where: { id: { in: personIds } },
         include: { address: true },
@@ -98,16 +97,16 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string, grou
     // Head is the first person (oldest record)
     const head = people[0];
 
-    // Determine Family Name: Priority is Head's Last Name (no email/phone in name)
-    const familyName = head.lastName ? `${head.lastName} Family` : `${head.firstName || 'Unknown'}'s Household`;
+    // Determine Household Name: Priority is Head's Last Name (no email/phone in name)
+    const householdName = head.lastName ? `${head.lastName} Household` : `${head.firstName || 'Unknown'}'s Household`;
 
     // Compute confidence score based on shared identifiers
     const { score, reason } = computeConfidenceScore(people, groupedBy);
 
-    // Create Family with confidence
-    const family = await prisma.family.create({
+    // Create Household with confidence
+    const household = await prisma.household.create({
         data: {
-            name: familyName,
+            householdName: householdName,
             confidenceScore: score,
             confidenceReason: reason,
         }
@@ -118,32 +117,27 @@ async function createFamilyForGroup(personIds: string[], groupedBy: string, grou
         const p = people[i];
         const role = i === 0 ? 'HEAD' : 'UNKNOWN';
 
-        await prisma.person.update({
-            where: { id: p.id },
-            data: { familyId: family.id }
-        });
-
-        await prisma.familyMember.create({
+        await prisma.householdMember.create({
             data: {
-                familyId: family.id,
+                householdId: household.id,
                 personId: p.id,
-                role: role,
+                roleInHousehold: role,
                 groupedBy: groupedBy
             }
         });
 
         await prisma.transaction.updateMany({
             where: { personId: p.id },
-            data: { familyId: family.id }
+            data: { householdId: household.id }
         });
     }
 }
 
 // Compute confidence score based on shared identifiers
-function computeConfidenceScore(people: Array<{ email?: string | null; phone?: string | null; address?: { id: string } | null }>, primaryGroupedBy: string): { score: number; reason: string } {
+function computeConfidenceScore(people: Array<{ primaryEmail?: string | null; primaryPhone?: string | null; address?: { id: string } | null }>, primaryGroupedBy: string): { score: number; reason: string } {
     // Check what identifiers are shared across ALL members
-    const hasSharedEmail = people.every(p => p.email) && new Set(people.map(p => p.email?.toLowerCase())).size === 1;
-    const hasSharedPhone = people.every(p => p.phone) && new Set(people.map(p => p.phone)).size === 1;
+    const hasSharedEmail = people.every(p => p.primaryEmail) && new Set(people.map(p => p.primaryEmail?.toLowerCase())).size === 1;
+    const hasSharedPhone = people.every(p => p.primaryPhone) && new Set(people.map(p => p.primaryPhone)).size === 1;
     const hasSharedAddress = people.every(p => p.address?.id) && new Set(people.map(p => p.address?.id)).size === 1;
 
     // Scoring rules based on the spec

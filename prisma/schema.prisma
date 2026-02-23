@@ -8,108 +8,367 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model Person {
-  id        String   @id @default(uuid())
+// ─────────────────────────────────────────────
+// PHASE 1B — Event & Registration Models
+// ─────────────────────────────────────────────
+
+model Institution {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
+
+  events      Event[]
+  people      Person[]
+  households  Household[]
+  orders      Order[]
+  submissions RegistrationSubmission[]
+
+  createdAt DateTime @default(now())
+}
+
+model Event {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+
+  title       String
+  slug        String  @unique
+  description String?
+  eventType   String // ticketed_event | family_program | recurring_program
+  category    String? // seminary | juniors | travel | community | fundraiser
+
+  startDate DateTime  @db.Date // DATE
+  endDate   DateTime? @db.Date // DATE nullable
+  startTime String? // TIME nullable (storing as string hh:mm matches TIME well)
+  endTime   String? // TIME nullable
+
+  locationType    String // in_person | online | hybrid
+  locationName    String? // e.g., 'Schulich Hall Auditorium'
+  locationAddress String?
+
+  requiresFamilyRegistration Boolean @default(false)
+  formFieldsJson             Json? // Custom fields: [{name, label, type, required}]
+
+  coverImageUrl    String?
+  isPublished      Boolean @default(false)
+  registrationOpen Boolean @default(true)
+  maxCapacity      Int? // from previous schema
+
+  tiers          TicketTier[]
+  orders         Order[]
+  participations EventParticipation[]
+  submissions    RegistrationSubmission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([institutionId])
+  @@index([slug])
+  @@index([startDate])
+}
+
+model TicketTier {
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  priceCents  Int
+  currency    String  @default("usd")
+
+  capacity     Int? // Null = unlimited per tier
+  quantitySold Int  @default(0)
+
+  earlyBirdPriceCents Int?
+  earlyBirdEndsAt     DateTime?
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  participations EventParticipation[]
+
+  createdAt DateTime @default(now())
+  Order     Order[]
+
+  @@index([eventId])
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id])
+
+  ticketTierId String?
+  ticketTier   TicketTier? @relation(fields: [ticketTierId], references: [id])
+
+  quantity Int
+
+  subtotalCents  Int
+  stripeFeeCents Int?
+  totalCents     Int
+  currency       String @default("usd")
+  feeHandling    String @default("absorb") // absorb | pass_to_buyer
+
+  purchaserEmail String
+  purchaserName  String?
+  purchaserPhone String?
+
+  orderStatus String @default("pending") // pending | confirmed | refunded | partially_refunded | failed
+
+  stripePaymentIntentId String? @unique
+  stripeSessionId       String? @unique
+  stripeRefundId        String? // from old schema
+  refundedAmount        Float?
+  refundedAt            DateTime?
+
+  personId    String?
+  person      Person?    @relation(fields: [personId], references: [id])
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id])
+
+  submissionId String?
+  submission   RegistrationSubmission? @relation(fields: [submissionId], references: [id])
+
+  participations EventParticipation[]
+
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+  updatedAt   DateTime  @updatedAt // from old schema
+
+  @@index([eventId])
+  @@index([purchaserEmail])
+  @@index([stripePaymentIntentId])
+}
+
+model RegistrationSubmission {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id])
+
+  orderId String?
+  orders  Order[] @relation() // Reverse relation to Order.submissionId
+
+  submissionChannel String // public_form | csv_import | checkout_page_webhook | ticket_purchase
+  rawPayloadJson    Json
+
+  processingStatus String @default("pending") // pending | matched | needs_review | error
+
+  // Resolution Details
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+  errorMessage     String?
+
+  participants RegistrationParticipant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // from old schema
+
+  @@index([eventId])
+  @@index([processingStatus])
+}
+
+model RegistrationParticipant {
+  id           String                 @id @default(uuid())
+  submissionId String
+  submission   RegistrationSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  // Raw input data
   firstName String?
   lastName  String?
   email     String?
   phone     String?
-  
-  // Normalized fields for consistent matching
+  dob       DateTime?
+
+  personId String?
+  person   Person? @relation(fields: [personId], references: [id])
+
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id])
+
+  role                 String? // adult_guardian | student | other
+  matchExplanationJson Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([submissionId])
+  @@index([personId])
+}
+
+model EventParticipation {
+  id       String @id @default(uuid())
+  eventId  String
+  event    Event  @relation(fields: [eventId], references: [id])
+  personId String
+  person   Person @relation(fields: [personId], references: [id])
+
+  ticketTierId String?
+  ticketTier   TicketTier? @relation(fields: [ticketTierId], references: [id])
+  orderId      String?
+  order        Order?      @relation(fields: [orderId], references: [id])
+
+  participationSource String // ticket_purchase | public_form | csv_import | webhook
+  status              String @default("registered") // registered | attended | cancelled | no_show | refunded
+
+  checkedInAt DateTime?
+  qrCodeToken String    @unique @default(uuid())
+  checkedInBy String? // from old schema
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, personId])
+  @@index([eventId])
+  @@index([personId])
+  @@index([qrCodeToken])
+}
+
+// ─────────────────────────────────────────────
+// PHASE 1A — Core People & Household
+// ─────────────────────────────────────────────
+
+model Person {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+
+  firstName String?
+  lastName  String?
+
+  primaryEmail    String?
   normalizedEmail String?
+  primaryPhone    String?
   normalizedPhone String?
-  
-  familyId  String?
-  family    Family?  @relation(fields: [familyId], references: [id])
-  
+  secondaryEmail  String?
+  secondaryPhone  String?
+
+  dateOfBirth DateTime?
+  gender      String?
+  notes       String? // Learning needs, dietary, etc.
+
+  createdSource String // public_form, csv_import, checkout_page_webhook, ticket_purchase
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Legacy relations
   addressId String?
   address   Address? @relation(fields: [addressId], references: [id])
 
-  transactions Transaction[]
-  memberships  FamilyMember[]
-  flags        PersonFlag[]
+  transactions        Transaction[]
+  householdsAsPrimary Household[]       @relation("PrimaryContact")
+  householdMembers    HouseholdMember[]
+  flags               PersonFlag[]
 
-  // Flagging
+  // Phase 1B relations
+  eventParticipations      EventParticipation[]
+  registrationParticipants RegistrationParticipant[]
+
+  // Flagging (from 1A)
   is_flagged         Boolean   @default(false)
   flag_reason        String?
   flagged_at         DateTime?
   mergedFromPersonId String?
+  Order              Order[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@index([email])
-  @@index([phone])
+  @@index([primaryEmail])
+  @@index([primaryPhone])
   @@index([lastName])
   @@index([normalizedEmail])
   @@index([normalizedPhone])
+  @@index([normalizedEmail, lastName])
+  @@index([normalizedPhone, lastName])
 }
 
+model Household {
+  id            String       @id @default(uuid())
+  institutionId String? // Made optional so old records don't break instantly if we migrate
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+
+  householdName          String
+  primaryContactPersonId String?
+  primaryContact         Person? @relation("PrimaryContact", fields: [primaryContactPersonId], references: [id])
+
+  addressLine1 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String? @default("US")
+
+  // For migration from 1A
+  confidenceScore  Int?
+  confidenceReason String?
+  source           String?
+
+  members      HouseholdMember[]
+  transactions Transaction[]
+  orders       Order[]
+  participants RegistrationParticipant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HouseholdMember {
+  id          String    @id @default(uuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  personId String
+  person   Person @relation(fields: [personId], references: [id])
+
+  roleInHousehold   String // guardian, child, other
+  isPrimaryGuardian Boolean @default(false)
+
+  // from 1A
+  groupedBy        String?
+  manualAssignment Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([householdId, personId])
+}
+
+// ─────────────────────────────────────────────
+// Other Preserved Models
+// ─────────────────────────────────────────────
 
 model Transaction {
   id           String   @id @default(uuid())
   amount       Decimal
-  type         String   // ticket, donation, program
+  type         String
   description  String?
   occurredAt   DateTime
   sourceSystem String?
-  
-  personId     String
-  person       Person   @relation(fields: [personId], references: [id])
-  
-  familyId     String?
-  family       Family?  @relation(fields: [familyId], references: [id])
-  
+
+  personId String
+  person   Person @relation(fields: [personId], references: [id])
+
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id])
+
   importFileId String?
   importFile   RawImportFile? @relation(fields: [importFileId], references: [id])
 
-  is_flagged   Boolean  @default(false)
-  flag_reason  String?
+  is_flagged     Boolean @default(false)
+  flag_reason    String?
   sourceRowIndex Int?
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 model RawImportFile {
-  id           String   @id @default(uuid())
+  id           String        @id @default(uuid())
   filename     String
   rowCount     Int
   sourceSystem String?
   transactions Transaction[]
-  createdAt    DateTime @default(now())
-}
-
-model Family {
-  id        String   @id @default(uuid())
-  name      String
-  
-  // Confidence scoring for auto-householding
-  confidenceScore  Int?      // 0-100 percentage
-  confidenceReason String?   // e.g., 'email+phone', 'address only'
-  
-  people    Person[]
-  members   FamilyMember[]
-  transactions Transaction[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model FamilyMember {
-  id               String   @id @default(uuid())
-  role             String   // HEAD, SPOUSE, CHILD, UNKNOWN
-  groupedBy        String   // PHONE, EMAIL, ADDRESS, MANUAL
-  manualAssignment Boolean  @default(false) // Phase 1B: true if manually assigned
-  
-  familyId  String
-  family    Family   @relation(fields: [familyId], references: [id])
-  
-  personId  String
-  person    Person   @relation(fields: [personId], references: [id])
-
-  createdAt DateTime @default(now())
-  
-  @@unique([familyId, personId])
+  createdAt    DateTime      @default(now())
 }
 
 model Address {
@@ -119,7 +378,6 @@ model Address {
   state          String?
   postalCode     String?
   normalizedHash String?  @unique
-  
   people         Person[]
 }
 
@@ -127,59 +385,56 @@ model Admin {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
-  role      String   @default("ADMIN") // SUPER_ADMIN or ADMIN
+  role      String   @default("ADMIN")
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// Phase 1B: Import job tracking
 model ImportJob {
-  id              String    @id @default(uuid())
+  id              String        @id @default(uuid())
   fileName        String
-  status          String    @default("pending") // pending | processing | completed | failed
-  rowsTotal       Int       @default(0)
-  rowsSuccess     Int       @default(0)
-  rowsErrors      Int       @default(0)
+  status          String        @default("pending")
+  rowsTotal       Int           @default(0)
+  rowsSuccess     Int           @default(0)
+  rowsErrors      Int           @default(0)
   startedAt       DateTime?
   finishedAt      DateTime?
   createdByUserId String?
-  summaryStats    Json      @default("{}")
-  createdAt       DateTime  @default(now())
-
+  summaryStats    Json          @default("{}")
+  createdAt       DateTime      @default(now())
   errors          ImportError[]
 }
 
 model ImportError {
-  id            String   @id @default(uuid())
-  importJobId   String
-  rowNumber     Int
-  rawRowData    Json
-  errorCode     String
-  errorMessage  String
-  fieldNames    String[] @default([])
-  createdAt     DateTime @default(now())
-
-  importJob     ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  id           String    @id @default(uuid())
+  importJobId  String
+  rowNumber    Int
+  rawRowData   Json
+  errorCode    String
+  errorMessage String
+  fieldNames   String[]  @default([])
+  createdAt    DateTime  @default(now())
+  importJob    ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
 }
 
 model PersonFlag {
-  id                String    @id @default(uuid())
-  actionType        String    @default("flag") // flag, merge
-  reason            String    // missing_details, repeated_person, summary_row, other
+  id                String  @id @default(uuid())
+  actionType        String  @default("flag")
+  reason            String
   notes             String?
-  snapshot          Json?     // snapshot of person data for undo
-  duplicatePersonId String?   // legacy field
-  targetPersonId    String?   // for merges: the surviving person id
+  snapshot          Json?
+  duplicatePersonId String?
+  targetPersonId    String?
 
-  personId          String?
-  person            Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personId String?
+  person   Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
 
-  undoneAt                  DateTime?
-  undoneByUserId            String?
-  permanentlyDeletedAt      DateTime?
+  undoneAt                   DateTime?
+  undoneByUserId             String?
+  permanentlyDeletedAt       DateTime?
   permanentlyDeletedByUserId String?
 
-  createdAt         DateTime  @default(now())
-  createdByUserId   String?
+  createdAt       DateTime @default(now())
+  createdByUserId String?
 }

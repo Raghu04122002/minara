@@ -11,10 +11,10 @@ export async function GET() {
         log.push('--- Verification Start ---');
 
         // 1. Cleanup
-        await prisma.familyMember.deleteMany();
+        await prisma.householdMember.deleteMany();
         await prisma.transaction.deleteMany();
         await prisma.person.deleteMany();
-        await prisma.family.deleteMany();
+        await prisma.household.deleteMany();
         log.push('Database cleaned.');
 
         // 2. CSV Import Simulation
@@ -25,7 +25,7 @@ bob@example.com,555-0102,Bob,Jones,50,Ticket
 charlie@example.com,555-0101,Charlie,Smith,200,Ticket
     `.trim();
 
-        // Note: Alice and Charlie share phone -> Should become a family
+        // Note: Alice and Charlie share phone -> Should become a household
         // Bob is separate.
 
         const importResult = await processCSVImport(csvContent, 'VerificationCSV');
@@ -33,28 +33,28 @@ charlie@example.com,555-0101,Charlie,Smith,200,Ticket
 
         // 3. Householding
         const householdResult = await runHouseholding();
-        log.push(`Householding: Created ${householdResult.familiesCreated} families.`);
+        log.push(`Householding: Created ${householdResult.familiesCreated} households.`);
 
         // 4. Assertions
-        const families = await prisma.family.findMany({ include: { members: { include: { person: true } } } });
-        const people = await prisma.person.findMany({ include: { family: true } });
+        const households = await prisma.household.findMany({ include: { members: { include: { person: true } } } });
+        const people = await prisma.person.findMany({ include: { householdMembers: true } });
 
-        if (families.length !== 1) {
-            log.push(`ERROR: Expected 1 family, found ${families.length}`);
+        if (households.length !== 1) {
+            log.push(`ERROR: Expected 1 household, found ${households.length}`);
         } else {
-            log.push(`SUCCESS: Found 1 family: "${families[0].name}"`);
-            const members = families[0].members.map((m: any) => m.person.firstName);
+            log.push(`SUCCESS: Found 1 household: "${households[0].householdName}"`);
+            const members = households[0].members.map((m: any) => m.person.firstName);
             log.push(`Members: ${members.join(', ')}`);
             if (members.includes('Alice') && members.includes('Charlie')) {
-                log.push('SUCCESS: Family contains Alice and Charlie (via Phone 555-0101)');
+                log.push('SUCCESS: Household contains Alice and Charlie (via Phone 555-0101)');
             } else {
-                log.push('ERROR: Family members incorrect.');
+                log.push('ERROR: Household members incorrect.');
             }
         }
 
         const bob = people.find((p: any) => p.firstName === 'Bob');
-        if (bob && !bob.familyId) {
-            log.push('SUCCESS: Bob is not in a family.');
+        if (bob && bob.householdMembers.length === 0) {
+            log.push('SUCCESS: Bob is not in a household.');
         } else {
             log.push('ERROR: Bob should be solo.');
         }

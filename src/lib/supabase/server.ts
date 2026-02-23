@@ -8,7 +8,21 @@ export async function createClient() {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim().replace(/^["'](.+)["']$/, '$1')?.trim()
 
     if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error('Missing Supabase environment variables.')
+        console.warn('[SUPABASE] Missing environment variables. Returning mock client for local development.');
+        return {
+            auth: {
+                getUser: async () => ({ data: { user: { id: 'local-admin', email: 'admin@local.dev' } }, error: null }),
+                getSession: async () => ({ data: { session: null }, error: null }),
+                signOut: async () => ({ error: null }),
+            },
+            from: () => ({
+                select: () => ({
+                    eq: () => ({
+                        single: async () => ({ data: null, error: null }),
+                    }),
+                }),
+            }),
+        } as any;
     }
 
     return createServerClient(
@@ -26,8 +40,6 @@ export async function createClient() {
                         )
                     } catch {
                         // The `setAll` method was called from a Server Component.
-                        // This can be ignored if you have middleware refreshing
-                        // user sessions.
                     }
                 },
             },

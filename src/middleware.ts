@@ -9,9 +9,12 @@ export async function middleware(request: NextRequest) {
         },
     })
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    const supabase = (supabaseUrl && supabaseAnonKey) ? createServerClient(
+        supabaseUrl,
+        supabaseAnonKey,
         {
             cookies: {
                 get(name: string) {
@@ -53,24 +56,45 @@ export async function middleware(request: NextRequest) {
                 },
             },
         }
-    )
+    ) : null;
 
-    const { data: { user } } = await supabase.auth.getUser()
+    let user = null;
 
-    // Protect all routes except auth-related
-    const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-    const isPublicRoute = request.nextUrl.pathname.startsWith('/_next') ||
-        request.nextUrl.pathname === '/favicon.ico' ||
-        request.nextUrl.pathname.startsWith('/api/') // Allow API for now, or protect explicitly // TODO: Protect API
+    // Auth Bypass for Local Development without Supabase
+    if (!supabase) {
+        console.warn('[MIDDLEWARE] Supabase URL missing. Engaging local auth bypass.');
+        user = { id: 'local-admin', email: 'admin@local.dev' };
+    } else {
+        try {
+            const { data } = await supabase.auth.getUser();
+            user = data.user;
+        } catch (e) {
+            console.error('[MIDDLEWARE] Supabase Auth Error:', e);
+        }
+    }
 
-    // If user is NOT logged in and trying to access protected route
-    // if (!user && !isAuthRoute && !isPublicRoute) {
-    //    return NextResponse.redirect(new URL('/login', request.url))
-    // }
+    const pathname = request.nextUrl.pathname
 
-    // If user IS logged in and trying to access login
-    if (user && isAuthRoute) {
-        return NextResponse.redirect(new URL('/', request.url))
+    // ─── Public routes (no auth required) ───
+    const isPublicRoute =
+        pathname.startsWith('/org/') ||
+        pathname.startsWith('/e/') ||
+        pathname.startsWith('/api/webhooks/') ||
+        pathname === '/login' ||
+        pathname.startsWith('/_next') ||
+        pathname === '/favicon.ico'
+
+    // ─── Admin routes (auth required) ───
+    const isAdminRoute = pathname.startsWith('/admin')
+
+    // If user is NOT logged in and trying to access admin
+    if (!user && isAdminRoute) {
+        return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // If user IS logged in and trying to access login, go to admin
+    if (user && pathname === '/login') {
+        return NextResponse.redirect(new URL('/admin', request.url))
     }
 
     return response

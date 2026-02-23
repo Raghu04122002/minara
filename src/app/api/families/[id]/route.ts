@@ -3,14 +3,14 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// Get family by ID
+// Get household by ID
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
-        const family = await prisma.family.findUnique({
+        const household = await prisma.household.findUnique({
             where: { id },
             include: {
                 members: {
@@ -19,24 +19,24 @@ export async function GET(
             }
         });
 
-        if (!family) {
+        if (!household) {
             return NextResponse.json(
-                { error: 'Family not found' },
+                { error: 'Household not found' },
                 { status: 404 }
             );
         }
 
-        return NextResponse.json(family);
+        return NextResponse.json(household);
     } catch (error) {
-        console.error('Error fetching family:', error);
+        console.error('Error fetching household:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch family' },
+            { error: 'Failed to fetch household' },
             { status: 500 }
         );
     }
 }
 
-// Delete a family
+// Delete a household
 export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -44,33 +44,27 @@ export async function DELETE(
     try {
         const { id } = await params;
 
-        // 1. Delete all family member records
-        await prisma.familyMember.deleteMany({
-            where: { familyId: id }
+        // 1. Delete all household member records
+        await prisma.householdMember.deleteMany({
+            where: { householdId: id }
         });
 
-        // 2. Update people to remove family reference
-        await prisma.person.updateMany({
-            where: { familyId: id },
-            data: { familyId: null }
-        });
-
-        // 3. Update transactions to remove family reference
+        // 2. Update transactions to remove household reference
         await prisma.transaction.updateMany({
-            where: { familyId: id },
-            data: { familyId: null }
+            where: { householdId: id },
+            data: { householdId: null }
         });
 
-        // 4. Delete the family
-        await prisma.family.delete({
+        // 4. Delete the household
+        await prisma.household.delete({
             where: { id }
         });
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting family:', error);
+        console.error('Error deleting household:', error);
         return NextResponse.json(
-            { error: 'Failed to delete family' },
+            { error: 'Failed to delete household' },
             { status: 500 }
         );
     }

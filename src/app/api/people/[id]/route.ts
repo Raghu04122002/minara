@@ -14,7 +14,11 @@ export async function GET(
             where: { id },
             include: {
                 transactions: true,
-                family: true
+                householdMembers: {
+                    include: {
+                        household: true
+                    }
+                }
             }
         });
 
@@ -43,17 +47,15 @@ export async function DELETE(
     try {
         const { id } = await params;
 
-        // Get the person's family before deletion
-        const person = await prisma.person.findUnique({
-            where: { id },
-            select: { familyId: true }
+        // Get the person's memberships before deletion
+        const memberships = await prisma.householdMember.findMany({
+            where: { personId: id },
+            select: { householdId: true }
         });
 
-        const familyId = person?.familyId;
-
         // First, delete related records in order
-        // 1. Delete family member records for this person
-        await prisma.familyMember.deleteMany({
+        // 1. Delete household member records for this person
+        await prisma.householdMember.deleteMany({
             where: { personId: id }
         });
 
@@ -67,33 +69,28 @@ export async function DELETE(
             where: { id }
         });
 
-        // 4. Check if family now has less than 2 members and delete if so
-        if (familyId) {
-            const remainingMembers = await prisma.familyMember.count({
-                where: { familyId }
+        // 4. Check if households now have less than 2 members and delete if so
+        for (const membership of memberships) {
+            const householdId = membership.householdId;
+            const remainingMembers = await prisma.householdMember.count({
+                where: { householdId }
             });
 
             if (remainingMembers < 2) {
-                // Delete all remaining family members
-                await prisma.familyMember.deleteMany({
-                    where: { familyId }
+                // Delete all remaining household members
+                await prisma.householdMember.deleteMany({
+                    where: { householdId }
                 });
 
-                // Update any people still pointing to this family
-                await prisma.person.updateMany({
-                    where: { familyId },
-                    data: { familyId: null }
-                });
-
-                // Delete family transactions
+                // Delete household transactions
                 await prisma.transaction.updateMany({
-                    where: { familyId },
-                    data: { familyId: null }
+                    where: { householdId },
+                    data: { householdId: null }
                 });
 
-                // Delete the family
-                await prisma.family.delete({
-                    where: { id: familyId }
+                // Delete the household
+                await prisma.household.delete({
+                    where: { id: householdId }
                 });
             }
         }
@@ -122,8 +119,8 @@ export async function PUT(
             data: {
                 firstName,
                 lastName,
-                email: email || null,
-                phone: phone || null
+                primaryEmail: email || null,
+                primaryPhone: phone || null
             }
         });
 

@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 
 interface DeleteFamilyButtonProps {
-    familyId: string;
-    familyName: string;
+    householdId: string;
+    householdName: string;
 }
 
-export default function DeleteFamilyButton({ familyId, familyName }: DeleteFamilyButtonProps) {
+export default function DeleteFamilyButton({ householdId, householdName }: DeleteFamilyButtonProps) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const router = useRouter();
@@ -17,19 +17,19 @@ export default function DeleteFamilyButton({ familyId, familyName }: DeleteFamil
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
-            const res = await fetch(`/api/families/${familyId}`, {
+            const res = await fetch(`/api/families/${householdId}`, {
                 method: 'DELETE'
             });
 
             if (res.ok) {
-                router.push('/families');
+                router.push('/admin/families');
                 router.refresh();
             } else {
                 const data = await res.json();
-                alert(data.error || 'Failed to delete family');
+                alert(data.error || 'Failed to delete household');
             }
         } catch (error) {
-            alert('Failed to delete family');
+            alert('Failed to delete household');
         } finally {
             setIsDeleting(false);
             setShowConfirm(false);
@@ -48,7 +48,7 @@ export default function DeleteFamilyButton({ familyId, familyName }: DeleteFamil
                 border: '1px solid #fecaca'
             }}>
                 <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#991b1b' }}>
-                    Delete {familyName}?
+                    Delete {householdName}?
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#dc2626' }}>
                     Members will be unlinked but not deleted.
@@ -108,7 +108,7 @@ export default function DeleteFamilyButton({ familyId, familyName }: DeleteFamil
             }}
         >
             <Trash2 size={14} />
-            Delete Family
+            Delete Household
         </button>
     );
 }

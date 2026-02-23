@@ -3,21 +3,21 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// Create a new family
+// Create a new household
 export async function POST(request: NextRequest) {
     try {
         const { name, initialMemberPersonId } = await request.json();
 
         if (!name) {
             return NextResponse.json(
-                { error: 'Family name is required' },
+                { error: 'Household name is required' },
                 { status: 400 }
             );
         }
 
-        const family = await prisma.family.create({
+        const household = await prisma.household.create({
             data: {
-                name,
+                householdName: name,
                 confidenceScore: 100,
                 confidenceReason: 'manually matched'
             }
@@ -25,36 +25,31 @@ export async function POST(request: NextRequest) {
 
         // If an initial member is provided, add them
         if (initialMemberPersonId) {
-            await prisma.familyMember.create({
+            await prisma.householdMember.create({
                 data: {
-                    familyId: family.id,
+                    householdId: household.id,
                     personId: initialMemberPersonId,
-                    role: 'HEAD',
+                    roleInHousehold: 'HEAD',
                     groupedBy: 'MANUAL',
                     manualAssignment: true
                 }
             });
-
-            await prisma.person.update({
-                where: { id: initialMemberPersonId },
-                data: { familyId: family.id }
-            });
         }
 
-        return NextResponse.json(family);
+        return NextResponse.json(household);
     } catch (error) {
-        console.error('Error creating family:', error);
+        console.error('Error creating household:', error);
         return NextResponse.json(
-            { error: 'Failed to create family' },
+            { error: 'Failed to create household' },
             { status: 500 }
         );
     }
 }
 
-// Get all families
+// Get all households
 export async function GET() {
     try {
-        const families = await prisma.family.findMany({
+        const households = await prisma.household.findMany({
             include: {
                 members: {
                     include: {
@@ -65,14 +60,14 @@ export async function GET() {
                     select: { transactions: true }
                 }
             },
-            orderBy: { name: 'asc' }
+            orderBy: { householdName: 'asc' }
         });
 
-        return NextResponse.json(families);
+        return NextResponse.json(households);
     } catch (error) {
-        console.error('Error fetching families:', error);
+        console.error('Error fetching households:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch families' },
+            { error: 'Failed to fetch households' },
             { status: 500 }
         );
     }

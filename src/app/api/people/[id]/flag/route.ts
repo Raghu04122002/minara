@@ -33,7 +33,7 @@ export async function POST(
             const [flaggedPerson, targetPerson] = await Promise.all([
                 prisma.person.findUnique({
                     where: { id },
-                    include: { memberships: true, transactions: true }
+                    include: { householdMembers: true, transactions: true }
                 }),
                 prisma.person.findUnique({ where: { id: duplicatePersonId } })
             ]);
@@ -48,18 +48,17 @@ export async function POST(
                     id: flaggedPerson.id,
                     firstName: flaggedPerson.firstName,
                     lastName: flaggedPerson.lastName,
-                    email: flaggedPerson.email,
-                    phone: flaggedPerson.phone,
+                    email: flaggedPerson.primaryEmail,
+                    phone: flaggedPerson.primaryPhone,
                     normalizedEmail: flaggedPerson.normalizedEmail,
                     normalizedPhone: flaggedPerson.normalizedPhone,
-                    familyId: flaggedPerson.familyId,
                     addressId: flaggedPerson.addressId,
                 },
                 transactionIds: flaggedPerson.transactions.map((t: any) => t.id),
-                memberships: flaggedPerson.memberships.map((m: any) => ({
+                householdMembers: flaggedPerson.householdMembers.map((m: any) => ({
                     id: m.id,
-                    familyId: m.familyId,
-                    role: m.role,
+                    householdId: m.householdId,
+                    role: m.roleInHousehold,
                     groupedBy: m.groupedBy,
                     manualAssignment: m.manualAssignment
                 }))
@@ -73,24 +72,24 @@ export async function POST(
                 data: { personId: duplicatePersonId }
             });
 
-            // B. Move family memberships (skip if target already in that family)
-            for (const membership of flaggedPerson.memberships) {
-                const existing = await prisma.familyMember.findUnique({
+            // B. Move household memberships (skip if target already in that household)
+            for (const membership of flaggedPerson.householdMembers) {
+                const existing = await prisma.householdMember.findUnique({
                     where: {
-                        familyId_personId: {
-                            familyId: membership.familyId,
+                        householdId_personId: {
+                            householdId: membership.householdId,
                             personId: duplicatePersonId
                         }
                     }
                 });
 
                 if (!existing) {
-                    await prisma.familyMember.update({
+                    await prisma.householdMember.update({
                         where: { id: membership.id },
                         data: { personId: duplicatePersonId }
                     });
                 } else {
-                    await prisma.familyMember.delete({
+                    await prisma.householdMember.delete({
                         where: { id: membership.id }
                     });
                 }
@@ -138,8 +137,8 @@ export async function POST(
                 id: person.id,
                 firstName: person.firstName,
                 lastName: person.lastName,
-                email: person.email,
-                phone: person.phone,
+                email: person.primaryEmail,
+                phone: person.primaryPhone,
                 is_flagged: person.is_flagged,
                 flag_reason: person.flag_reason,
             }

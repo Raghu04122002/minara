@@ -18,6 +18,14 @@ export default function LoginPage() {
         setError('');
 
         try {
+            // Local fallback bypass
+            if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('mock')) {
+                console.log('[LOGIN] Local auth bypass engaged');
+                router.refresh();
+                router.push('/admin');
+                return;
+            }
+
             const { error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
@@ -27,7 +35,7 @@ export default function LoginPage() {
                 setError(error.message);
             } else {
                 router.refresh();
-                router.push('/');
+                router.push('/admin');
             }
         } catch (err) {
             setError('An error occurred');

@@ -21,14 +21,14 @@ export async function GET(request: NextRequest) {
 
         if (normalizedEmail) {
             existing = await prisma.person.findFirst({
-                where: { normalizedEmail }
+                where: { primaryEmail: normalizedEmail }
             });
             if (existing) matchedOn = 'email';
         }
 
         if (!existing && normalizedPhone) {
             existing = await prisma.person.findFirst({
-                where: { normalizedPhone }
+                where: { primaryPhone: normalizedPhone }
             });
             if (existing) matchedOn = 'phone';
         }

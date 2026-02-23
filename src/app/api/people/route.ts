@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const noFamily = searchParams.get('noFamily') === 'true';
 
-        const where = noFamily ? { familyId: null } : {};
+        const where = noFamily ? { householdMembers: { none: {} } } : {};
 
         const people = await prisma.person.findMany({
             where,
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
                 id: true,
                 firstName: true,
                 lastName: true,
-                email: true
+                primaryEmail: true
             }
         });
 
@@ -49,12 +49,14 @@ export async function POST(request: NextRequest) {
 
         const person = await prisma.person.create({
             data: {
+                institutionId: 'unassigned', // Required by schema
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
-                email: normalizedEmail,
-                phone: normalizedPhone,
+                primaryEmail: normalizedEmail,
+                primaryPhone: normalizedPhone,
                 normalizedEmail,
-                normalizedPhone
+                normalizedPhone,
+                createdSource: 'manual_entry'
             }
         });
 

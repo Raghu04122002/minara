@@ -1,0 +1,122 @@
+import { prisma } from '@/lib/prisma';
+import UploadDropzone from '@/components/UploadDropzone';
+import RunHouseholdingButton from '@/components/RunHouseholdingButton';
+import ResetDataButton from '@/components/ResetDataButton';
+import LogoutButton from '@/components/LogoutButton';
+import FlagToggle from '@/components/FlagToggle';
+import { Users, CreditCard, Home as HomeIcon, Settings, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+
+// Helper for stats card
+function StatCard({ title, value, icon, link }: { title: string, value: string | number, icon: any, link?: string }) {
+    return (
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '50%', color: '#2563eb' }}>
+                {icon}
+            </div>
+            <div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{title}</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{value}</div>
+                {link && <Link href={link} style={{ fontSize: '0.8rem', color: '#2563eb', textDecoration: 'none' }}>View All &rarr;</Link>}
+            </div>
+        </div>
+    );
+}
+
+export const dynamic = 'force-dynamic';
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ includeFlagged?: string }> }) {
+    const params = await searchParams;
+    const includeFlagged = params.includeFlagged === 'true';
+    const where = includeFlagged ? {} : { is_flagged: false };
+
+    // Count all people (not filtered by transactions)
+    const peopleCount = await prisma.person.count();
+    const txCount = await prisma.transaction.count({ where });
+    const familyCount = await prisma.household.count();
+    const flaggedPeopleCount = await prisma.person.count({ where: { is_flagged: true } });
+
+    const totalCents = await prisma.transaction.aggregate({
+        where,
+        _sum: { amount: true }
+    });
+
+    // Check user role
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const userEmail = user?.email;
+    const isMiftaah = userEmail === 'miftaah@minara.org.in';
+    const isSuperAdmin = !isMiftaah; // For now, everyone else is super admin in this MVP
+
+    return (
+        <main className="container">
+            <header style={{ marginBottom: '3rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#111827', marginBottom: '0.25rem' }}>
+                        {isMiftaah ? 'Miftaah by Minara' : 'Minara Admin'}
+                    </h1>
+                    <p style={{ color: '#6b7280', margin: 0 }}>Engagement Insights Validation MVP</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    {isSuperAdmin && (
+                        <Link href="/admin/settings/users" className="btn" style={{ background: '#f3f4f6', color: '#374151' }}>
+                            <Settings size={16} style={{ marginRight: '0.5rem' }} />
+                            Manage Users
+                        </Link>
+                    )}
+                    <LogoutButton />
+                </div>
+            </header>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px' }}>
+                <FlagToggle initialChecked={includeFlagged} />
+                {isSuperAdmin && (
+                    <Link href="/admin/people/flagged" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+                        <AlertTriangle size={16} />
+                        Review Anomalies &rarr;
+                    </Link>
+                )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
+                <StatCard
+                    title="Total People"
+                    value={peopleCount.toLocaleString()}
+                    icon={<Users size={24} />}
+                    link="/admin/people"
+                />
+                <StatCard
+                    title="Total Families"
+                    value={familyCount.toLocaleString()}
+                    icon={<HomeIcon size={24} />}
+                    link="/admin/families"
+                />
+                <StatCard
+                    title="Transactions"
+                    value={txCount.toLocaleString()}
+                    icon={<CreditCard size={24} />}
+                />
+                <StatCard
+                    title="Total Volume"
+                    value={'$' + Number(totalCents._sum.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    icon={<div style={{ fontWeight: 'bold' }}>$</div>}
+                />
+                {isSuperAdmin && (
+                    <StatCard
+                        title="Flagged People"
+                        value={flaggedPeopleCount.toLocaleString()}
+                        icon={<AlertTriangle size={24} />}
+                        link="/admin/people/flagged"
+                    />
+                )}
+            </div>
+
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+                <UploadDropzone />
+                <RunHouseholdingButton />
+                {isSuperAdmin && <ResetDataButton />}
+            </div>
+        </main>
+    );
+}

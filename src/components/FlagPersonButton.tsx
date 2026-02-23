@@ -8,7 +8,7 @@ interface Person {
     id: string;
     firstName: string;
     lastName: string;
-    email: string | null;
+    primaryEmail: string | null;
 }
 
 interface FlagPersonButtonProps {
@@ -45,7 +45,7 @@ export default function FlagPersonButton({ personId, personName }: FlagPersonBut
 
     const filteredPeople = people.filter(p => {
         const name = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase();
-        const email = (p.email || '').toLowerCase();
+        const email = (p.primaryEmail || '').toLowerCase();
         const term = searchTerm.toLowerCase();
         return name.includes(term) || email.includes(term);
     });
@@ -284,7 +284,7 @@ export default function FlagPersonButton({ personId, personName }: FlagPersonBut
                                             }}>
                                                 <span>
                                                     ✓ {selectedPerson.firstName} {selectedPerson.lastName}
-                                                    {selectedPerson.email && <span style={{ color: '#6b7280' }}> ({selectedPerson.email})</span>}
+                                                    {selectedPerson.primaryEmail && <span style={{ color: '#6b7280' }}> ({selectedPerson.primaryEmail})</span>}
                                                 </span>
                                                 <button
                                                     onClick={() => setDuplicatePersonId('')}
@@ -334,8 +334,8 @@ export default function FlagPersonButton({ personId, personName }: FlagPersonBut
                                                             <div style={{ fontWeight: 500 }}>
                                                                 {p.firstName} {p.lastName}
                                                             </div>
-                                                            {p.email && (
-                                                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{p.email}</div>
+                                                            {p.primaryEmail && (
+                                                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{p.primaryEmail}</div>
                                                             )}
                                                         </button>
                                                     ))

@@ -51,7 +51,7 @@ export default function DeletePersonButton({ personId, personName }: DeletePerso
                     Delete {personName}?
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#dc2626' }}>
-                    This will also delete all transactions and family memberships.
+                    This will also delete all transactions and household memberships.
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                     <button

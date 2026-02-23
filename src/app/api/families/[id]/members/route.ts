@@ -3,13 +3,13 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// Add a person to a family
+// Add a person to a household
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id: familyId } = await params;
+        const { id: householdId } = await params;
         const { personId, role = 'UNKNOWN' } = await request.json();
 
         if (!personId) {
@@ -19,60 +19,54 @@ export async function POST(
             );
         }
 
-        // Check if family exists
-        const family = await prisma.family.findUnique({
-            where: { id: familyId }
+        // Check if household exists
+        const household = await prisma.household.findUnique({
+            where: { id: householdId }
         });
 
-        if (!family) {
+        if (!household) {
             return NextResponse.json(
-                { error: 'Family not found' },
+                { error: 'Household not found' },
                 { status: 404 }
             );
         }
 
-        // Create or update family member (manual assignment)
-        const member = await prisma.familyMember.upsert({
+        // Create or update household member (manual assignment)
+        const member = await prisma.householdMember.upsert({
             where: {
-                familyId_personId: { familyId, personId }
+                householdId_personId: { householdId, personId }
             },
             update: {
-                role,
+                roleInHousehold: role,
                 groupedBy: 'MANUAL',
                 manualAssignment: true
             },
             create: {
-                familyId,
+                householdId,
                 personId,
-                role,
+                roleInHousehold: role,
                 groupedBy: 'MANUAL',
                 manualAssignment: true
             }
         });
 
-        // Also update the Person's familyId
-        await prisma.person.update({
-            where: { id: personId },
-            data: { familyId }
-        });
-
         return NextResponse.json(member);
     } catch (error) {
-        console.error('Error adding family member:', error);
+        console.error('Error adding household member:', error);
         return NextResponse.json(
-            { error: 'Failed to add family member' },
+            { error: 'Failed to add household member' },
             { status: 500 }
         );
     }
 }
 
-// Remove a person from a family
+// Remove a person from a household
 export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id: familyId } = await params;
+        const { id: householdId } = await params;
         const { searchParams } = new URL(request.url);
         const personId = searchParams.get('personId');
 
@@ -83,51 +77,39 @@ export async function DELETE(
             );
         }
 
-        // Remove family member
-        await prisma.familyMember.deleteMany({
-            where: { familyId, personId }
+        // Remove household member
+        await prisma.householdMember.deleteMany({
+            where: { householdId, personId }
         });
 
-        // Clear person's familyId
-        await prisma.person.update({
-            where: { id: personId },
-            data: { familyId: null }
-        });
-
-        // Check remaining members and delete family if less than 2
-        const remainingCount = await prisma.familyMember.count({
-            where: { familyId }
+        // Check remaining members and delete household if less than 2
+        const remainingCount = await prisma.householdMember.count({
+            where: { householdId }
         });
 
         if (remainingCount < 2) {
-            // Delete all remaining family members
-            await prisma.familyMember.deleteMany({
-                where: { familyId }
+            // Delete all remaining household members
+            await prisma.householdMember.deleteMany({
+                where: { householdId }
             });
 
-            // Update any people still pointing to this family
-            await prisma.person.updateMany({
-                where: { familyId },
-                data: { familyId: null }
-            });
-
-            // Update transactions to remove family reference
+            // Update transactions to remove household reference
             await prisma.transaction.updateMany({
-                where: { familyId },
-                data: { familyId: null }
+                where: { householdId },
+                data: { householdId: null }
             });
 
-            // Delete the family
-            await prisma.family.delete({
-                where: { id: familyId }
+            // Delete the household
+            await prisma.household.delete({
+                where: { id: householdId }
             });
         }
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error removing family member:', error);
+        console.error('Error removing household member:', error);
         return NextResponse.json(
-            { error: 'Failed to remove family member' },
+            { error: 'Failed to remove household member' },
             { status: 500 }
         );
     }
