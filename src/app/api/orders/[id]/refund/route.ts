@@ -20,7 +20,7 @@ export async function POST(
             return NextResponse.json({ error: 'No payment intent to refund' }, { status: 400 });
         }
 
-        if (order.status === 'refunded') {
+        if (order.orderStatus === 'refunded') {
             return NextResponse.json({ error: 'Already refunded' }, { status: 400 });
         }
 
@@ -33,7 +33,7 @@ export async function POST(
         await prisma.order.update({
             where: { id },
             data: {
-                status: 'refunded',
+                orderStatus: 'refunded',
                 refundedAmount: order.totalCents,
                 refundedAt: new Date(),
             },

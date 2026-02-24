@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 
 // GET /api/events — list all events
 export async function GET() {
@@ -19,6 +20,10 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const { title, slug, description, eventType, startDate, endDate, locationName, locationType, maxCapacity, tiers } = body;
+
+        // Get authenticated user
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (!title || !slug || !eventType || !startDate || !locationType) {
             return NextResponse.json(
@@ -56,6 +61,7 @@ export async function POST(request: NextRequest) {
                 locationName: locationName || null,
                 maxCapacity: maxCapacity ? parseInt(maxCapacity) : null,
                 institutionId: institution.id,
+                organizerId: user?.id || null, // Attach organizer ID if authenticated
                 tiers: tiers && tiers.length > 0 ? {
                     create: tiers.map((tier: { name: string; price: number; quantity?: number; description?: string }, i: number) => ({
                         name: tier.name,

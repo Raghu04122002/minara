@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: submissionId } = await params;
     const formData = await req.formData();

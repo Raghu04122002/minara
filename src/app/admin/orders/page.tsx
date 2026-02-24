@@ -25,7 +25,7 @@ export default async function AdminOrdersPage() {
     });
 
     const totalRevenue = orders
-        .filter((o: any) => o.status === 'confirmed')
+        .filter((o: any) => o.orderStatus === 'confirmed')
         .reduce((sum: number, o: any) => sum + Number(o.totalCents), 0);
 
     const totalRefunded = orders.reduce((sum: number, o: any) => sum + Number(o.refundedAmount || 0), 0);
@@ -72,7 +72,7 @@ export default async function AdminOrdersPage() {
                         </thead>
                         <tbody>
                             {orders.map((order: any) => {
-                                const badge = statusBadge(order.status);
+                                const badge = statusBadge(order.orderStatus);
                                 return (
                                     <tr key={order.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                         <td style={{ padding: '0.75rem 1rem' }}>
@@ -94,14 +94,14 @@ export default async function AdminOrdersPage() {
                                                 fontSize: '0.7rem', fontWeight: 600,
                                                 background: badge.bg, color: badge.color,
                                             }}>
-                                                {order.status}
+                                                {order.orderStatus}
                                             </span>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', color: '#6b7280', fontSize: '0.8rem' }}>
                                             {new Date(order.createdAt).toLocaleDateString()}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            {order.status === 'confirmed' && order.stripePaymentIntentId && (
+                                            {order.orderStatus === 'confirmed' && order.stripePaymentIntentId && (
                                                 <form action={`/api/orders/${order.id}/refund`} method="POST">
                                                     <button type="submit" style={{
                                                         padding: '0.25rem 0.5rem', fontSize: '0.7rem',

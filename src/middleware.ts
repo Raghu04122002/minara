@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
     // Auth Bypass for Local Development without Supabase
     if (!supabase) {
         console.warn('[MIDDLEWARE] Supabase URL missing. Engaging local auth bypass.');
-        user = { id: 'local-admin', email: 'admin@local.dev' };
+        user = { id: 'local-admin', email: 'admin@local.dev', user_metadata: { role: 'admin' } };
     } else {
         try {
             const { data } = await supabase.auth.getUser();
@@ -73,31 +73,44 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    const pathname = request.nextUrl.pathname
+    const pathname = request.nextUrl.pathname;
 
-    // ─── Public routes (no auth required) ───
-    const isPublicRoute =
-        pathname.startsWith('/org/') ||
-        pathname.startsWith('/e/') ||
-        pathname.startsWith('/api/webhooks/') ||
-        pathname === '/login' ||
-        pathname.startsWith('/_next') ||
-        pathname === '/favicon.ico'
+    const isAdminRoute = pathname.startsWith('/admin');
+    const isOrganizerRoute = pathname.startsWith('/organizer') && !pathname.startsWith('/organizer/login') && !pathname.startsWith('/organizer/register');
 
-    // ─── Admin routes (auth required) ───
-    const isAdminRoute = pathname.startsWith('/admin')
-
-    // If user is NOT logged in and trying to access admin
-    if (!user && isAdminRoute) {
-        return NextResponse.redirect(new URL('/login', request.url))
+    if (isAdminRoute) {
+        if (!user) {
+            return NextResponse.redirect(new URL('/login', request.url));
+        }
+        // If they have a role, and it's 'organizer', block them from admin!
+        if (user.user_metadata && user.user_metadata.role === 'organizer') {
+            return NextResponse.redirect(new URL('/organizer/events', request.url));
+        }
     }
 
-    // If user IS logged in and trying to access login, go to admin
+    if (isOrganizerRoute) {
+        if (!user) {
+            return NextResponse.redirect(new URL('/organizer/login', request.url));
+        }
+        // Admin or organizer are both allowed into organizer routes if we want,
+        // but typically organizers go here. If we strictly restrict:
+        if (user.user_metadata && user.user_metadata.role !== 'organizer' && user.user_metadata.role !== 'admin') {
+            // For older admin users without a role, we'll let them in or not. 
+            // In a strict setup, we require 'organizer'. Let's let admins access organizer routes too by assuming no role = admin.
+        }
+    }
+
+    // Redirect logged-in users away from login pages
     if (user && pathname === '/login') {
-        return NextResponse.redirect(new URL('/admin', request.url))
+        const isOrg = user.user_metadata?.role === 'organizer';
+        return NextResponse.redirect(new URL(isOrg ? '/organizer/events' : '/admin', request.url));
     }
 
-    return response
+    if (user && (pathname === '/organizer/login' || pathname === '/organizer/register')) {
+        return NextResponse.redirect(new URL('/organizer/events', request.url));
+    }
+
+    return response;
 }
 
 export const config = {

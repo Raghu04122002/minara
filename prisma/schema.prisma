@@ -62,6 +62,8 @@ model Event {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  organizerId String? // Links to Auth User ID (UUID) from Supabase
+
   @@index([institutionId])
   @@index([slug])
   @@index([startDate])
